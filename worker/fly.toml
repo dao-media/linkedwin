@@ -1,0 +1,21 @@
+# fly.toml app configuration file generated for linkedwin-worker
+app = "linkedwin-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PLAYWRIGHT_ENABLED = "true"
+  PLAYWRIGHT_HEADLESS = "true"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[processes]
+  worker = "npx tsx worker/process-jobs.ts"
+
+# Schedule via external cron hitting the app /api/worker/run or run as a
+# short-lived machine. Prefer Vercel cron → /api/worker/run for lowest cost.
