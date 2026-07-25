@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   formatCalendarDate,
+  formatCompactNumber,
   formatHashtagLabel,
 } from "@/lib/calendar-format";
 
@@ -16,6 +17,7 @@ export type HashtagPostSummary = {
   topics: string;
   scheduledFor: string | null;
   publishedAt: string | null;
+  impressions?: number | null;
 };
 
 type HashtagPostsModalProps = {
@@ -23,6 +25,8 @@ type HashtagPostsModalProps = {
   posts: HashtagPostSummary[];
   onClose: () => void;
 };
+
+const PAGE_SIZE = 25;
 
 function postLabel(post: HashtagPostSummary) {
   const raw = post.title?.trim() || post.content.trim();
@@ -36,6 +40,10 @@ function postDate(post: HashtagPostSummary) {
   return formatCalendarDate(new Date(iso));
 }
 
+function impressionsOf(post: HashtagPostSummary) {
+  return post.impressions ?? 0;
+}
+
 export function HashtagPostsModal({
   tag,
   posts,
@@ -43,6 +51,24 @@ export function HashtagPostsModal({
 }: HashtagPostsModalProps) {
   const router = useRouter();
   const label = formatHashtagLabel(tag);
+  const [page, setPage] = useState(0);
+  const [pageTag, setPageTag] = useState(tag);
+  if (tag !== pageTag) {
+    setPageTag(tag);
+    setPage(0);
+  }
+
+  const sorted = useMemo(() => {
+    return [...posts].sort((a, b) => {
+      const diff = impressionsOf(b) - impressionsOf(a);
+      if (diff !== 0) return diff;
+      const aKey = a.publishedAt || a.scheduledFor || "";
+      const bKey = b.publishedAt || b.scheduledFor || "";
+      return bKey.localeCompare(aKey);
+    });
+  }, [posts]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -51,6 +77,14 @@ export function HashtagPostsModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const safePage = Math.min(page, totalPages - 1);
+  const pagePosts = sorted.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE,
+  );
+  const from = sorted.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
+  const to = Math.min(sorted.length, (safePage + 1) * PAGE_SIZE);
 
   return (
     <div
@@ -61,7 +95,7 @@ export function HashtagPostsModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[min(32rem,85vh)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-lg"
+        className="flex max-h-[min(36rem,90vh)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
@@ -73,7 +107,8 @@ export function HashtagPostsModal({
               Posts with {label}
             </h2>
             <p className="mt-0.5 text-xs text-[var(--muted)]">
-              {posts.length} {posts.length === 1 ? "post" : "posts"}
+              {sorted.length} {sorted.length === 1 ? "post" : "posts"} · sorted
+              by impressions
             </p>
           </div>
           <button
@@ -86,13 +121,13 @@ export function HashtagPostsModal({
           </button>
         </div>
 
-        <ul className="overflow-y-auto py-1">
-          {posts.length === 0 && (
+        <ul className="min-h-0 flex-1 overflow-y-auto py-1">
+          {pagePosts.length === 0 && (
             <li className="px-5 py-8 text-center text-sm text-[var(--muted)]">
               No posts use this hashtag.
             </li>
           )}
-          {posts.map((post) => (
+          {pagePosts.map((post) => (
             <li key={post.id}>
               <button
                 type="button"
@@ -109,8 +144,10 @@ export function HashtagPostsModal({
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]">
                   {postLabel(post)}
                 </span>
-                <span className="shrink-0 text-xs text-[var(--muted)]">
-                  {post.status}
+                <span className="shrink-0 text-right text-xs text-[var(--muted)]">
+                  <span className="font-semibold tabular-nums text-[var(--ink)]">
+                    {formatCompactNumber(post.impressions)}
+                  </span>
                   <span className="mx-1.5 text-[var(--line)]">·</span>
                   {postDate(post)}
                 </span>
@@ -118,6 +155,39 @@ export function HashtagPostsModal({
             </li>
           ))}
         </ul>
+
+        {sorted.length > PAGE_SIZE ? (
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-5 py-3">
+            <p className="text-xs text-[var(--muted)]">
+              {from}–{to} of {sorted.length}
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={safePage <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="inline-flex size-8 items-center justify-center rounded-md border border-[var(--line)] text-[var(--ink)] disabled:opacity-40"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="size-4" strokeWidth={1.2} />
+              </button>
+              <span className="min-w-[4.5rem] text-center text-xs font-medium text-[var(--muted)]">
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={safePage >= totalPages - 1}
+                onClick={() =>
+                  setPage((p) => Math.min(totalPages - 1, p + 1))
+                }
+                className="inline-flex size-8 items-center justify-center rounded-md border border-[var(--line)] text-[var(--ink)] disabled:opacity-40"
+                aria-label="Next page"
+              >
+                <ChevronRight className="size-4" strokeWidth={1.2} />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

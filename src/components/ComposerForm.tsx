@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Pencil, Trash2 } from "lucide-react";
+import { CalendarClock, FileText, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FooterDeleteModal } from "@/components/FooterDeleteModal";
 import { FooterEditModal } from "@/components/FooterEditModal";
+import { MediaField } from "@/components/MediaField";
+import { MentionInsert } from "@/components/MentionInsert";
+import {
+  nextPinnedComments,
+  PinnedCommentsFields,
+} from "@/components/PinnedCommentsFields";
 import { VoiceInsertBar } from "@/components/VoiceInsertBar";
 import type { SavedFooter } from "@/lib/footers";
+import { lowercaseHashtagsInText } from "@/lib/calendar-format";
+import type { ComposerMediaType } from "@/lib/media-shared";
 
 type FooterModal =
   | { type: "create"; seedBody: string }
@@ -17,15 +25,15 @@ type FooterModal =
 export function ComposerForm() {
   const router = useRouter();
   const [content, setContent] = useState("");
-  const [firstComment, setFirstComment] = useState("");
-  const [secondComment, setSecondComment] = useState("");
+  /** Progressive fields: always one blank trail until 3 total. */
+  const [comments, setComments] = useState<string[]>([""]);
   const [scheduledFor, setScheduledFor] = useState("");
   const [topics, setTopics] = useState("AI agents");
   const [repostEnabled, setRepostEnabled] = useState(true);
   const [mediaUrl, setMediaUrl] = useState("");
-  const [mediaType, setMediaType] = useState<"image" | "document" | "">("");
+  const [mediaType, setMediaType] = useState<ComposerMediaType | "">("");
   const [mediaTitle, setMediaTitle] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<"draft" | "schedule" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
@@ -39,7 +47,8 @@ export function ComposerForm() {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     d.setHours(9, 0, 0, 0);
-    return d.toISOString().slice(0, 16);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }, []);
 
   useEffect(() => {
@@ -60,16 +69,22 @@ export function ComposerForm() {
   }, []);
 
   function insert(chars: string) {
-    setContent((c) => `${c}${chars}`);
+    setContent((c) => lowercaseHashtagsInText(`${c}${chars}`));
   }
 
   function insertFooter(body: string) {
     setContent((c) => {
-      if (!c) return body;
-      if (c.endsWith("\n\n")) return `${c}${body}`;
-      if (c.endsWith("\n")) return `${c}\n${body}`;
-      return `${c}\n\n${body}`;
+      let next: string;
+      if (!c) next = body;
+      else if (c.endsWith("\n\n")) next = `${c}${body}`;
+      else if (c.endsWith("\n")) next = `${c}\n${body}`;
+      else next = `${c}\n\n${body}`;
+      return lowercaseHashtagsInText(next);
     });
+  }
+
+  function updateComment(index: number, value: string) {
+    setComments((prev) => nextPinnedComments(prev, index, value));
   }
 
   async function saveFooter(payload: { name: string; body: string }) {
@@ -119,9 +134,8 @@ export function ComposerForm() {
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  async function save(mode: "draft" | "schedule") {
+    setSaving(mode);
     setError(null);
     setOk(null);
     try {
@@ -131,28 +145,53 @@ export function ComposerForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
-          firstComment: firstComment || undefined,
-          secondComment: secondComment || undefined,
-          scheduledFor: new Date(when).toISOString(),
+          comments: comments.map((c) => c.trim()).filter(Boolean),
+          scheduledFor:
+            mode === "schedule"
+              ? new Date(when).toISOString()
+              : scheduledFor
+                ? new Date(scheduledFor).toISOString()
+                : undefined,
           topics: topics
             .split(",")
-            .map((t) => t.trim())
+            .map((t) => t.replace(/^#/, "").trim().toLowerCase())
             .filter(Boolean),
           repostEnabled,
           mediaType: mediaType || null,
           mediaUrl: mediaUrl || null,
           mediaTitle: mediaTitle || null,
+          asDraft: mode === "draft",
         }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ?? "Failed to schedule");
-      setOk("Scheduled. Redirecting to Calendar…");
+      if (!res.ok) {
+        throw new Error(
+          body.error ??
+            (mode === "draft" ? "Failed to save draft" : "Failed to schedule"),
+        );
+      }
+      if (mode === "draft") {
+        setOk("Draft saved. Redirecting to Calendar…");
+      } else {
+        const armed = Boolean(body.post?.zernioPostId);
+        const n = comments.map((c) => c.trim()).filter(Boolean).length;
+        setOk(
+          armed
+            ? `Scheduled with Zernio. ${n ? `${n} pinned comment${n === 1 ? "" : "s"} + ` : ""}12h repost armed. Redirecting…`
+            : "Saved locally, but Zernio did not accept the schedule — check Settings. Redirecting…",
+        );
+      }
       setTimeout(() => router.push("/calendar"), 800);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await save("schedule");
   }
 
   return (
@@ -169,12 +208,14 @@ export function ComposerForm() {
             className="min-h-48 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] p-3 text-sm outline-none focus:border-[var(--accent)]"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onBlur={() => setContent((c) => lowercaseHashtagsInText(c))}
             placeholder="Write your LinkedIn post here..."
             required
           />
         </label>
 
         <VoiceInsertBar onInsert={insert} />
+        <MentionInsert onInsert={insert} />
 
         <section className="space-y-2.5">
           <div className="flex items-center gap-2">
@@ -252,71 +293,18 @@ export function ComposerForm() {
           )}
         </section>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-              Media type
-            </span>
-            <select
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
-              value={mediaType}
-              onChange={(e) =>
-                setMediaType(e.target.value as "image" | "document" | "")
-              }
-            >
-              <option value="">None</option>
-              <option value="image">Image</option>
-              <option value="document">Document (PDF)</option>
-            </select>
-          </label>
-          <label className="block text-sm md:col-span-2">
-            <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-              Media URL
-            </span>
-            <input
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
-              value={mediaUrl}
-              onChange={(e) => setMediaUrl(e.target.value)}
-              placeholder="https://..."
-            />
-          </label>
-        </div>
+        <MediaField
+          mediaType={mediaType}
+          mediaUrl={mediaUrl}
+          mediaTitle={mediaTitle}
+          onChange={({ mediaType: t, mediaUrl: u, mediaTitle: title }) => {
+            setMediaType(t);
+            setMediaUrl(u);
+            setMediaTitle(title);
+          }}
+        />
 
-        {mediaType === "document" && (
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-              Document title
-            </span>
-            <input
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
-              value={mediaTitle}
-              onChange={(e) => setMediaTitle(e.target.value)}
-            />
-          </label>
-        )}
-
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-            First comment (auto after publish)
-          </span>
-          <textarea
-            className="min-h-20 w-full rounded-lg border border-[var(--line)] bg-white p-3"
-            value={firstComment}
-            onChange={(e) => setFirstComment(e.target.value)}
-            placeholder="Put links here to protect reach"
-          />
-        </label>
-
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-            Second comment (queued for worker)
-          </span>
-          <textarea
-            className="min-h-16 w-full rounded-lg border border-[var(--line)] bg-white p-3"
-            value={secondComment}
-            onChange={(e) => setSecondComment(e.target.value)}
-          />
-        </label>
+        <PinnedCommentsFields comments={comments} onChange={updateComment} />
 
         <div className="grid gap-3 md:grid-cols-3">
           <label className="block text-sm">
@@ -353,14 +341,25 @@ export function ComposerForm() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         {ok && <p className="text-sm text-[var(--success)]">{ok}</p>}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-        >
-          <CalendarClock className="size-4" strokeWidth={1.2} aria-hidden />
-          {saving ? "Scheduling…" : "Schedule post"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={Boolean(saving) || !content.trim()}
+            onClick={() => void save("draft")}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--bg)] disabled:opacity-50"
+          >
+            <FileText className="size-4" strokeWidth={1.2} aria-hidden />
+            {saving === "draft" ? "Saving…" : "Save draft"}
+          </button>
+          <button
+            type="submit"
+            disabled={Boolean(saving) || !content.trim()}
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            <CalendarClock className="size-4" strokeWidth={1.2} aria-hidden />
+            {saving === "schedule" ? "Scheduling…" : "Schedule post"}
+          </button>
+        </div>
       </form>
 
       {(footerModal?.type === "create" || footerModal?.type === "edit") && (

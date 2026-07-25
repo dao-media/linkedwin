@@ -1,139 +1,593 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleHelp,
+  KeyRound,
+  RefreshCw,
+  Save,
+  Shield,
+  Tags,
+} from "lucide-react";
+
+type SessionHealth = "healthy" | "expired" | "unknown";
 
 type SettingsState = {
   zernioApiKeySet: boolean;
   zernioAccountId: string;
-  sessionHealth: string;
+  zernioAccountLabel?: string;
+  sessionHealth: SessionHealth | string;
+  linkedinSessionSet: boolean;
+  sessionCorrupt?: boolean;
   niches: string;
   linkedinFollowers: string;
+  lastSyncedAt?: string | null;
 };
 
+function StatusPill({
+  tone,
+  children,
+}: {
+  tone: "success" | "danger" | "muted" | "accent";
+  children: React.ReactNode;
+}) {
+  const styles =
+    tone === "success"
+      ? "border-[#b7e0cb] bg-[#eaf7f0] text-[var(--success)]"
+      : tone === "danger"
+        ? "border-[#f0c2bc] bg-[#fdf0ee] text-[#c0392b]"
+        : tone === "accent"
+          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+          : "border-[var(--line)] bg-[var(--bg)] text-[var(--muted)]";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${styles}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+        {label}
+      </span>
+      {children}
+      {hint ? (
+        <span className="mt-1.5 block text-xs leading-relaxed text-[var(--muted)]">
+          {hint}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+const inputClass =
+  "w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]";
+
+const SECRET_MASK = "••••••••••••••••••••••••••••••••";
+const SESSION_MASK =
+  "••••••••••••••••••••••••••••••••••••••••••••••••••••\n••••••••••••••••••••••••••••••••••••••••••••••••••••\n••••••••••••••••  session JSON saved  ••••••••••••••••";
+
 export function SettingsForm() {
+  const [loaded, setLoaded] = useState(false);
   const [state, setState] = useState<SettingsState | null>(null);
   const [apiKey, setApiKey] = useState("");
+  const [apiKeyDirty, setApiKeyDirty] = useState(false);
   const [accountId, setAccountId] = useState("");
   const [niches, setNiches] = useState("");
-  const [sessionHealth, setSessionHealth] = useState("unknown");
-  const [linkedinFollowers, setLinkedinFollowers] = useState("");
+  const [sessionHealth, setSessionHealth] = useState<SessionHealth>("unknown");
+  const [linkedinSession, setLinkedinSession] = useState("");
+  const [sessionDirty, setSessionDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [syncSummary, setSyncSummary] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => {
+      .then((data: SettingsState) => {
+        if (cancelled) return;
         setState(data);
         setAccountId(data.zernioAccountId ?? "");
         setNiches(data.niches ?? "");
-        setSessionHealth(data.sessionHealth ?? "unknown");
-        setLinkedinFollowers(data.linkedinFollowers ?? "");
+        setSessionHealth(
+          (data.sessionHealth as SessionHealth) || "unknown",
+        );
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Failed to load settings");
+          setLoaded(true);
+        }
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  async function refreshSettings() {
+    const data = (await fetch("/api/settings").then((r) =>
+      r.json(),
+    )) as SettingsState;
+    setState(data);
+    setAccountId(data.zernioAccountId ?? "");
+    setNiches(data.niches ?? "");
+    setSessionHealth((data.sessionHealth as SessionHealth) || "unknown");
+    return data;
+  }
+
+  const sessionTone = useMemo(() => {
+    if (sessionHealth === "healthy") return "success" as const;
+    if (sessionHealth === "expired") return "danger" as const;
+    return "muted" as const;
+  }, [sessionHealth]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    setSaving(true);
     setMsg(null);
-    const res = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        zernioApiKey: apiKey || undefined,
-        zernioAccountId: accountId,
-        niches,
-        sessionHealth,
-        linkedinFollowers,
-      }),
-    });
-    if (!res.ok) {
-      setMsg("Save failed");
-      return;
+    setError(null);
+
+    const sessionJson = linkedinSession.trim();
+    if (sessionDirty && sessionJson) {
+      try {
+        const parsed: unknown = JSON.parse(sessionJson);
+        if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { cookies?: unknown }).cookies)) {
+          setError(
+            "LinkedIn session must be Playwright storageState JSON (with cookies)",
+          );
+          setSaving(false);
+          return;
+        }
+      } catch {
+        setError("LinkedIn session JSON is invalid");
+        setSaving(false);
+        return;
+      }
     }
-    setMsg("Saved");
-    setApiKey("");
-    const data = await fetch("/api/settings").then((r) => r.json());
-    setState(data);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          zernioApiKey:
+            apiKeyDirty && apiKey.trim() ? apiKey.trim() : undefined,
+          zernioAccountId: accountId,
+          niches,
+          sessionHealth,
+          // Always send the raw string — never a parsed object
+          linkedinSession:
+            sessionDirty && sessionJson ? sessionJson : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          typeof data.error === "string" ? data.error : "Save failed",
+        );
+        return;
+      }
+      setMsg("Settings saved");
+      setApiKey("");
+      setApiKeyDirty(false);
+      setLinkedinSession("");
+      setSessionDirty(false);
+      await refreshSettings();
+    } catch {
+      setError("Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runSync() {
+    setSyncing(true);
+    setSyncSummary(null);
+    setError(null);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/sync", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error ?? "Sync failed");
+      }
+      await refreshSettings();
+      const parts = [
+        data.followers != null
+          ? `${Number(data.followers).toLocaleString()} followers`
+          : null,
+        data.postsImported
+          ? `${data.postsImported} posts imported`
+          : null,
+        data.metricsSynced
+          ? `${data.metricsSynced} metrics refreshed`
+          : null,
+        data.demoPostsRemoved
+          ? `${data.demoPostsRemoved} demo posts removed`
+          : null,
+      ].filter(Boolean);
+      const warn =
+        Array.isArray(data.warnings) && data.warnings.length
+          ? ` Note: ${data.warnings.join(" ")}`
+          : "";
+      setSyncSummary(
+        parts.length
+          ? `Synced — ${parts.join(" · ")}.${warn}`
+          : `Sync finished.${warn}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <p className="text-sm text-[var(--muted)]">Loading settings…</p>
+    );
   }
 
   return (
-    <form
-      onSubmit={save}
-      className="max-w-xl space-y-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5"
-    >
-      <label className="block text-sm">
-        <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-          Zernio API key {state?.zernioApiKeySet ? "(set)" : "(missing)"}
-        </span>
-        <input
-          type="password"
-          className="w-full rounded-lg border border-[var(--line)] px-3 py-2"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Paste to update"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-          LinkedIn account ID (Zernio)
-        </span>
-        <input
-          className="w-full rounded-lg border border-[var(--line)] px-3 py-2"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-          Browser session (repost worker)
-        </span>
-        <select
-          className="w-full rounded-lg border border-[var(--line)] px-3 py-2"
-          value={sessionHealth}
-          onChange={(e) => setSessionHealth(e.target.value)}
+    <form onSubmit={save} className="space-y-5">
+      {state?.sessionCorrupt || sessionHealth === "expired" ? (
+        <div className="flex items-start gap-3 rounded-xl border border-[#f0c2bc] bg-[#fdf0ee] px-4 py-3 text-sm text-[#8a2a20]">
+          <AlertTriangle
+            className="mt-0.5 size-4 shrink-0"
+            strokeWidth={1.2}
+            aria-hidden
+          />
+          <div>
+            <p className="font-semibold">
+              {state?.sessionCorrupt
+                ? "Browser session JSON is corrupted"
+                : "Browser session expired"}
+            </p>
+            <p className="mt-0.5 text-[#8a2a20]/90">
+              {state?.sessionCorrupt
+                ? "The saved value was not valid Playwright storageState (often from String(object) → “[object Object]”). Run npm run session:capture or restore from linkedin-session.json, then Save."
+                : "Repost and second-comment jobs are paused until you paste a fresh Playwright storage state below and mark the session healthy."}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+            <KeyRound className="size-3.5" strokeWidth={1.2} aria-hidden />
+            Zernio
+          </div>
+          <div className="mt-3">
+            <StatusPill tone={state?.zernioApiKeySet ? "accent" : "danger"}>
+              {state?.zernioApiKeySet ? "Key saved" : "Missing key"}
+            </StatusPill>
+          </div>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            {state?.zernioAccountLabel
+              ? state.zernioAccountLabel
+              : accountId
+                ? `Account ${accountId.slice(0, 12)}${accountId.length > 12 ? "…" : ""}`
+                : "No LinkedIn account ID yet"}
+            {state?.linkedinFollowers
+              ? ` · ${Number(state.linkedinFollowers).toLocaleString()} followers`
+              : ""}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+            <Shield className="size-3.5" strokeWidth={1.2} aria-hidden />
+            Browser session
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <StatusPill tone={sessionTone}>
+              {sessionHealth === "healthy"
+                ? "Healthy"
+                : sessionHealth === "expired"
+                  ? "Expired"
+                  : "Unknown"}
+            </StatusPill>
+            <StatusPill tone={state?.linkedinSessionSet ? "muted" : "danger"}>
+              {state?.linkedinSessionSet ? "JSON stored" : "No session JSON"}
+            </StatusPill>
+            <StatusPill
+              tone={
+                sessionHealth === "healthy" && state?.linkedinSessionSet
+                  ? "success"
+                  : "muted"
+              }
+            >
+              {sessionHealth === "healthy" && state?.linkedinSessionSet
+                ? "12h repost armed"
+                : "12h repost paused"}
+            </StatusPill>
+          </div>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            Keep <code className="text-[11px]">npm run dev</code> running — it
+            starts the automation worker with the app. No manual worker toggle
+            needed after scheduling.
+          </p>
+        </div>
+      </div>
+
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <RefreshCw
+                className="size-4 text-[var(--accent)]"
+                strokeWidth={1.2}
+                aria-hidden
+              />
+              Zernio data sync
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
+              Pull follower count and metrics for posts published through
+              LinkedWin/Zernio. Pre-handoff history comes from your LinkedIn
+              analytics export — Sync won’t overwrite those rows.
+            </p>
+            {state?.lastSyncedAt ? (
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                Last sync{" "}
+                {new Date(state.lastSyncedAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+                {state.linkedinFollowers
+                  ? ` · ${Number(state.linkedinFollowers).toLocaleString()} followers`
+                  : ""}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                Not synced yet — run a sync to replace demo data with your
+                account.
+              </p>
+            )}
+            {syncSummary ? (
+              <p className="mt-2 text-sm text-[var(--success)]">{syncSummary}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => void runSync()}
+            disabled={syncing || !state?.zernioApiKeySet}
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`size-4 ${syncing ? "animate-spin" : ""}`}
+              strokeWidth={1.2}
+              aria-hidden
+            />
+            {syncing ? "Syncing…" : "Sync now"}
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="mb-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <KeyRound
+              className="size-4 text-[var(--accent)]"
+              strokeWidth={1.2}
+              aria-hidden
+            />
+            Publishing (Zernio)
+          </h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Schedule posts, first comments, and analytics sync through Zernio.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field
+            label={`API key ${state?.zernioApiKeySet ? "(saved)" : "(missing)"}`}
+            hint={
+              state?.zernioApiKeySet
+                ? "Asterisks mean a key is saved. Focus the field and paste a new key only if you want to replace it."
+                : "Paste your Zernio API key, then save."
+            }
+          >
+            <input
+              type="password"
+              className={inputClass}
+              value={
+                apiKeyDirty
+                  ? apiKey
+                  : state?.zernioApiKeySet
+                    ? SECRET_MASK
+                    : ""
+              }
+              onFocus={() => {
+                if (!apiKeyDirty && state?.zernioApiKeySet) {
+                  setApiKeyDirty(true);
+                  setApiKey("");
+                }
+              }}
+              onChange={(e) => {
+                setApiKeyDirty(true);
+                setApiKey(e.target.value);
+              }}
+              placeholder={
+                state?.zernioApiKeySet ? "Paste new key to replace" : "Paste API key"
+              }
+              autoComplete="off"
+            />
+          </Field>
+          <Field
+            label="LinkedIn account ID"
+            hint="From Zernio → list accounts (GET /v1/accounts) after you connect LinkedIn. Paste the LinkedIn account’s _id here."
+          >
+            <input
+              className={inputClass}
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              placeholder="e.g. 66b2e19d8c3f5a7e9d0b1c2e"
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Shield
+                className="size-4 text-[var(--accent)]"
+                strokeWidth={1.2}
+                aria-hidden
+              />
+              Browser session (repost worker)
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
+              Powers native 12h self-reposts and optional second comments. Capture
+              with <code className="text-[11px]">npm run session:capture</code>,
+              paste here, mark healthy. The worker starts with{" "}
+              <code className="text-[11px]">npm run dev</code>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSessionHealth("healthy")}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline"
+          >
+            <CheckCircle2 className="size-3.5" strokeWidth={1.2} aria-hidden />
+            Mark healthy
+          </button>
+        </div>
+
+        <div className="mb-4 rounded-lg bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--ink)]">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)]">
+            <CircleHelp className="size-3.5" strokeWidth={1.2} aria-hidden />
+            Capture a fresh session
+          </p>
+            <ol className="list-decimal space-y-1 pl-4 text-xs leading-relaxed text-[var(--muted)]">
+              <li>
+                Run{" "}
+                <code className="rounded bg-white/80 px-1 py-0.5 text-[var(--ink)]">
+                  npm run session:capture
+                </code>{" "}
+                and log in with email + password (not Google)
+              </li>
+              <li>
+                Open{" "}
+                <code className="rounded bg-white/80 px-1 py-0.5 text-[var(--ink)]">
+                  linkedin-session.json
+                </code>{" "}
+                and paste its contents below
+              </li>
+              <li>Save settings and mark session healthy</li>
+            </ol>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+          <Field label="Session health">
+            <select
+              className={inputClass}
+              value={sessionHealth}
+              onChange={(e) =>
+                setSessionHealth(e.target.value as SessionHealth)
+              }
+            >
+              <option value="healthy">Healthy</option>
+              <option value="expired">Expired — reconnect</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </Field>
+          <Field
+            label="Playwright storage state"
+            hint={
+              state?.linkedinSessionSet
+                ? "Asterisks mean a session JSON is saved. Focus and paste only to replace it."
+                : "No session stored yet. Paste storage-state JSON to enable the worker."
+            }
+          >
+            <textarea
+              className={`${inputClass} min-h-32 font-mono text-xs`}
+              value={
+                sessionDirty
+                  ? linkedinSession
+                  : state?.linkedinSessionSet
+                    ? SESSION_MASK
+                    : ""
+              }
+              onFocus={() => {
+                if (!sessionDirty && state?.linkedinSessionSet) {
+                  setSessionDirty(true);
+                  setLinkedinSession("");
+                }
+              }}
+              onChange={(e) => {
+                setSessionDirty(true);
+                setLinkedinSession(e.target.value);
+              }}
+              placeholder='{"cookies":[...],"origins":[...]}'
+              spellCheck={false}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="mb-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Tags
+              className="size-4 text-[var(--accent)]"
+              strokeWidth={1.2}
+              aria-hidden
+            />
+            Niches
+          </h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Topics that guide Radar and Engage scoring context. Followers are
+            pulled automatically from Zernio when you sync.
+          </p>
+        </div>
+        <Field
+          label="Niches"
+          hint="Comma-separated topics you publish around."
         >
-          <option value="healthy">healthy</option>
-          <option value="expired">expired — reconnect</option>
-          <option value="unknown">unknown</option>
-        </select>
-      </label>
-      <label className="block text-sm">
-        <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-          Current LinkedIn followers
-        </span>
-        <input
-          type="number"
-          min={0}
-          className="w-full rounded-lg border border-[var(--line)] px-3 py-2"
-          value={linkedinFollowers}
-          onChange={(e) => setLinkedinFollowers(e.target.value)}
-          placeholder="e.g. 12480"
-        />
-        <span className="mt-1 block text-xs text-[var(--muted)]">
-          Snapshot stamped onto each post when it goes live, and saved to
-          follower growth history for Trends. Historical counts for older posts
-          usually aren’t available from LinkedIn.
-        </span>
-      </label>
-      <label className="block text-sm">
-        <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-          Niches (comma-separated)
-        </span>
-        <input
-          className="w-full rounded-lg border border-[var(--line)] px-3 py-2"
-          value={niches}
-          onChange={(e) => setNiches(e.target.value)}
-          placeholder="AI agents, B2B content, Product ops"
-        />
-      </label>
-      {msg && <p className="text-sm text-[var(--success)]">{msg}</p>}
-      <button
-        type="submit"
-        className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white"
-      >
-        <Save className="size-4" strokeWidth={1.2} aria-hidden />
-        Save settings
-      </button>
+          <input
+            className={inputClass}
+            value={niches}
+            onChange={(e) => setNiches(e.target.value)}
+            placeholder="AI agents, B2B content, Product ops"
+          />
+        </Field>
+      </section>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        >
+          <Save className="size-4" strokeWidth={1.2} aria-hidden />
+          {saving ? "Saving…" : "Save settings"}
+        </button>
+        {msg ? (
+          <p className="text-sm font-medium text-[var(--success)]">{msg}</p>
+        ) : null}
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </div>
     </form>
   );
 }

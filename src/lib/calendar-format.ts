@@ -28,12 +28,12 @@ export function formatCalendarDate(d: Date): string {
   return `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-/** e.g. 24-07-2026 */
+/** e.g. 07/24/2026 */
 export function formatLibraryDate(d: Date): string {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
+  return `${mm}/${dd}/${yyyy}`;
 }
 
 export function formatLibraryDateTime(iso: string | null | undefined): {
@@ -134,18 +134,26 @@ export function normalizeHashtagKey(tag: string): string {
   return tag.trim().replace(/^#/, "").replace(/\s+/g, "").toLowerCase();
 }
 
+/** Always `#lowercase` (spaces collapsed when no leading #). */
 export function formatHashtagLabel(tag: string): string {
   const raw = tag.trim();
   if (!raw) return "";
   const body = raw.startsWith("#") ? raw.slice(1) : raw.replace(/\s+/g, "");
-  return `#${body}`;
+  return `#${body.toLowerCase()}`;
+}
+
+/** Lowercase every `#Tag` token in caption text (rest of text unchanged). */
+export function lowercaseHashtagsInText(text: string): string {
+  return text.replace(/#([\w]+)/g, (_, body: string) => `#${body.toLowerCase()}`);
 }
 
 export function extractHashtags(
   content: string,
   topicsJson: string,
 ): string[] {
-  const fromContent = [...content.matchAll(/#([\w]+)/g)].map((m) => `#${m[1]}`);
+  const fromContent = [...content.matchAll(/#([\w]+)/g)].map((m) =>
+    formatHashtagLabel(m[0]),
+  );
   let topics: string[] = [];
   try {
     topics = JSON.parse(topicsJson) as string[];
@@ -163,7 +171,7 @@ export function extractHashtags(
     const key = normalizeHashtagKey(tag);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    out.push(tag.startsWith("#") ? tag : formatHashtagLabel(tag));
+    out.push(formatHashtagLabel(tag));
   }
   return out;
 }
@@ -183,13 +191,24 @@ export function postHasHashtag(
 export function countFirstComments(
   firstComment?: string | null,
   secondComment?: string | null,
-  extraComments?: string[] | null,
+  thirdComment?: string | null,
 ): number {
-  let n = 0;
-  if (firstComment?.trim()) n += 1;
-  if (secondComment?.trim()) n += 1;
-  if (extraComments?.length) {
-    n += extraComments.filter((c) => c?.trim()).length;
-  }
-  return n;
+  return [firstComment, secondComment, thirdComment].filter((c) =>
+    Boolean(c?.trim()),
+  ).length;
+}
+
+/** Up to 3 non-empty pinned comments, in order. */
+export function normalizePinnedComments(
+  input?: Array<string | null | undefined> | null,
+) {
+  const filled = (input ?? [])
+    .map((c) => (c ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  return {
+    firstComment: filled[0],
+    secondComment: filled[1],
+    thirdComment: filled[2],
+  };
 }

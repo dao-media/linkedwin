@@ -2,20 +2,34 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createScheduledPost } from "@/lib/posts";
 
-const schema = z.object({
-  content: z.string().min(1),
-  title: z.string().optional(),
-  scheduledFor: z.string().min(1),
-  timezone: z.string().optional(),
-  firstComment: z.string().optional(),
-  secondComment: z.string().optional(),
-  mediaType: z.enum(["image", "video", "document"]).nullable().optional(),
-  mediaUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
-  mediaTitle: z.string().nullable().optional(),
-  topics: z.array(z.string()).optional(),
-  repostEnabled: z.boolean().optional(),
-  repostAfterHours: z.number().optional(),
-});
+const schema = z
+  .object({
+    content: z.string().min(1),
+    title: z.string().optional(),
+    scheduledFor: z.string().optional(),
+    timezone: z.string().optional(),
+    /** Up to 3 pinned comments in order. */
+    comments: z.array(z.string()).max(3).optional(),
+    firstComment: z.string().optional(),
+    secondComment: z.string().optional(),
+    thirdComment: z.string().optional(),
+    mediaType: z.enum(["image", "video", "document"]).nullable().optional(),
+    mediaUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
+    mediaTitle: z.string().nullable().optional(),
+    topics: z.array(z.string()).optional(),
+    repostEnabled: z.boolean().optional(),
+    repostAfterHours: z.number().optional(),
+    asDraft: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (!val.asDraft && !val.scheduledFor) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "scheduledFor is required when scheduling",
+        path: ["scheduledFor"],
+      });
+    }
+  });
 
 export async function POST(req: Request) {
   try {

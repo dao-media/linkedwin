@@ -1,5 +1,9 @@
 import { and, asc, desc, eq, lte } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import {
+  canExecuteBrowserJobs,
+  isRetryableJobError,
+} from "@/lib/automation";
 import { db, ensureSchema } from "@/lib/db";
 import { automationJobs, metricsSnapshots, posts } from "@/lib/schema";
 import { getSetting, setSetting } from "@/lib/settings";
@@ -10,11 +14,14 @@ export type JobResult = {
   processed: number;
   done: string[];
   failed: { id: string; error: string }[];
+  deferred: string[];
 };
 
 async function markPublishedIfReady(postId: string) {
   const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
-  if (!post?.zernioPostId) return post;
+  if (!post?.zernioPostId || post.zernioPostId.startsWith("favikon:")) {
+    return post;
+  }
   try {
     const remote = await getZernioPost(post.zernioPostId);
     const status =
@@ -56,7 +63,12 @@ async function markPublishedIfReady(postId: string) {
 }
 
 async function runRepost(postId: string) {
-  const session = await getSetting("linkedin_session");
+  const { parseStoredLinkedInSession } = await import(
+    "@/lib/linkedin-session"
+  );
+  const session = parseStoredLinkedInSession(
+    await getSetting("linkedin_session"),
+  );
   const health = (await getSetting("session_health")) ?? "unknown";
   if (!session || health === "expired") {
     await setSetting("session_health", "expired");
@@ -66,55 +78,68 @@ async function runRepost(postId: string) {
   }
 
   const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
-  if (!post?.linkedinPostUrl && !post?.zernioPostId) {
+  if (!post?.linkedinPostUrl) {
     throw new Error("No LinkedIn URL available for repost yet");
   }
 
-  const payload = {
-    action: "repost",
+  const { executeLinkedInRepost } = await import(
+    "../../worker/linkedin-browser"
+  );
+  await executeLinkedInRepost({
     postId,
     url: post.linkedinPostUrl,
-    sessionKey: "linkedin_session",
-  };
-
-  if (process.env.PLAYWRIGHT_ENABLED === "true") {
-    const { executeLinkedInRepost } = await import(
-      "../../worker/linkedin-browser"
-    );
-    await executeLinkedInRepost(payload);
-  } else if (process.env.WORKER_DRY_RUN === "true") {
-    console.info("[repost] dry-run:", payload);
-  } else {
-    throw new Error(
-      "PLAYWRIGHT_ENABLED is not true — set it on the Fly worker to execute reposts",
-    );
-  }
+  });
 }
 
 async function runSecondComment(postId: string) {
+  await runQueuedComment(postId, "second");
+}
+
+async function runThirdComment(postId: string) {
+  await runQueuedComment(postId, "third");
+}
+
+async function runQueuedComment(postId: string, which: "second" | "third") {
   const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
-  if (!post?.secondComment) return;
-  if (!post.linkedinPostUrl) {
-    throw new Error("Post not published yet — cannot add second comment");
-  }
-  if (process.env.PLAYWRIGHT_ENABLED === "true") {
-    const { executeLinkedInComment } = await import(
-      "../../worker/linkedin-browser"
+  const comment =
+    which === "second" ? post?.secondComment : post?.thirdComment;
+  if (!comment) return;
+  if (!post?.linkedinPostUrl) {
+    throw new Error(
+      `Post not published yet — cannot add ${which} comment`,
     );
-    await executeLinkedInComment({
-      url: post.linkedinPostUrl,
-      comment: post.secondComment,
-    });
-  } else if (process.env.WORKER_DRY_RUN === "true") {
-    console.info("[second_comment] dry-run", post.secondComment);
-  } else {
-    throw new Error("PLAYWRIGHT_ENABLED required for second comments");
   }
+  const { parseStoredLinkedInSession } = await import(
+    "@/lib/linkedin-session"
+  );
+  const session = parseStoredLinkedInSession(
+    await getSetting("linkedin_session"),
+  );
+  const health = (await getSetting("session_health")) ?? "unknown";
+  if (!session || health === "expired") {
+    await setSetting("session_health", "expired");
+    throw new Error(
+      "LinkedIn browser session missing/expired — reconnect in Settings",
+    );
+  }
+  const { executeLinkedInComment } = await import(
+    "../../worker/linkedin-browser"
+  );
+  await executeLinkedInComment({
+    url: post.linkedinPostUrl,
+    comment,
+  });
+}
+
+function deferMs(attempts: number) {
+  const mins = Math.min(30, [2, 5, 15, 30][Math.min(attempts, 3)] ?? 30);
+  return mins * 60 * 1000;
 }
 
 export async function processDueJobs(limit = 10): Promise<JobResult> {
   await ensureSchema();
   const now = new Date().toISOString();
+  const browserOk = canExecuteBrowserJobs();
   const due = await db
     .select()
     .from(automationJobs)
@@ -127,8 +152,20 @@ export async function processDueJobs(limit = 10): Promise<JobResult> {
 
   const done: string[] = [];
   const failed: { id: string; error: string }[] = [];
+  const deferred: string[] = [];
 
   for (const job of due) {
+    const needsBrowser =
+      job.type === "repost" ||
+      job.type === "second_comment" ||
+      job.type === "third_comment";
+
+    if (needsBrowser && !browserOk) {
+      // Leave pending for the local/Fly Playwright worker.
+      deferred.push(job.id);
+      continue;
+    }
+
     await db
       .update(automationJobs)
       .set({
@@ -143,6 +180,8 @@ export async function processDueJobs(limit = 10): Promise<JobResult> {
         await runRepost(job.postId);
       } else if (job.type === "second_comment") {
         await runSecondComment(job.postId);
+      } else if (job.type === "third_comment") {
+        await runThirdComment(job.postId);
       } else if (job.type === "metrics_sync") {
         await syncMetricsForPost(job.postId);
       }
@@ -157,6 +196,23 @@ export async function processDueJobs(limit = 10): Promise<JobResult> {
       done.push(job.id);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
+      const attempts = (job.attempts ?? 0) + 1;
+
+      if (isRetryableJobError(message) && attempts < 8) {
+        const nextRun = new Date(Date.now() + deferMs(attempts)).toISOString();
+        await db
+          .update(automationJobs)
+          .set({
+            status: "pending",
+            runAt: nextRun,
+            lastError: `${message} (retry at ${nextRun})`,
+            completedAt: null,
+          })
+          .where(eq(automationJobs.id, job.id));
+        deferred.push(job.id);
+        continue;
+      }
+
       await db
         .update(automationJobs)
         .set({
@@ -169,12 +225,13 @@ export async function processDueJobs(limit = 10): Promise<JobResult> {
     }
   }
 
-  return { processed: due.length, done, failed };
+  return { processed: due.length, done, failed, deferred };
 }
 
 export async function syncMetricsForPost(postId: string) {
   const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
-  if (!post?.zernioPostId) return;
+  // Historical imports use null or legacy favikon:* ids — Zernio only.
+  if (!post?.zernioPostId || post.zernioPostId.startsWith("favikon:")) return;
   const analytics = await getZernioPostAnalytics(post.zernioPostId);
   if (!analytics) return;
 
@@ -223,11 +280,12 @@ export async function syncAllRecentMetrics() {
     .from(posts)
     .where(eq(posts.status, "published"))
     .orderBy(desc(posts.publishedAt))
-    .limit(50)
+    .limit(80)
     .all();
 
   let synced = 0;
   for (const p of recent) {
+    if (!p.zernioPostId || p.zernioPostId.startsWith("favikon:")) continue;
     try {
       await syncMetricsForPost(p.id);
       synced += 1;

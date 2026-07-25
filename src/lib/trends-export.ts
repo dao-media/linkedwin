@@ -3,7 +3,7 @@ import {
   formatCompactNumber,
   formatLibraryDate,
 } from "@/lib/calendar-format";
-import type { TrendsPostSummary } from "@/lib/trends";
+import type { TrendsPostSummary } from "@/lib/trends-shared";
 import {
   TRENDS_PERIODS,
   periodStartIso,
@@ -13,6 +13,7 @@ import {
 export const REFERENCE_RANK_OPTIONS = [
   { id: "impressions", label: "Impressions", slug: "topimpressions" },
   { id: "engagement", label: "Engagement", slug: "byengagement" },
+  { id: "likes", label: "Likes", slug: "bylikes" },
   { id: "comments", label: "Comments", slug: "bycomments" },
   { id: "saves", label: "Saves", slug: "bysaves" },
   { id: "sends", label: "Sends", slug: "bysends" },
@@ -38,10 +39,41 @@ export type ReferenceFilters = {
   period: TrendsPeriodId;
   rankBy: ReferenceRankId;
   count: ReferenceCount;
+  /** Case-insensitive match against title, caption, topics, comments. */
+  keyword?: string;
 };
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
+}
+
+function slugifyKeyword(raw: string) {
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return s || null;
+}
+
+function postMatchesKeyword(post: TrendsPostSummary, keyword: string) {
+  const q = keyword.trim().toLowerCase();
+  if (!q) return true;
+  const hay = [
+    post.title,
+    post.content,
+    post.footer,
+    post.topics,
+    post.firstComment,
+    post.secondComment,
+    post.thirdComment,
+    post.mediaTitle,
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+  return hay.includes(q);
 }
 
 /** Filesystem-safe time (colon is illegal on macOS). Matches Figma preview style. */
@@ -67,7 +99,9 @@ export function buildReferenceFilterSlug(
     REFERENCE_RANK_OPTIONS.find((r) => r.id === filters.rankBy)?.slug ??
     filters.rankBy;
   const period = PERIOD_SLUG[filters.period] ?? filters.period;
-  return `${rank}-${period}-${selectedCount}`;
+  const kw = slugifyKeyword(filters.keyword ?? "");
+  const base = `${rank}-${period}-${selectedCount}`;
+  return kw ? `${base}-kw-${kw}` : base;
 }
 
 /**
@@ -88,10 +122,12 @@ export function filterReferencePosts(
   filters: ReferenceFilters,
 ): TrendsPostSummary[] {
   const start = periodStartIso(filters.period);
+  const keyword = filters.keyword?.trim() ?? "";
   const inPeriod = posts.filter((p) => {
     if (!p.publishedAt) return false;
-    if (!start) return true;
-    return p.publishedAt >= start;
+    if (start && p.publishedAt < start) return false;
+    if (keyword && !postMatchesKeyword(p, keyword)) return false;
+    return true;
   });
 
   const sorted = inPeriod.slice().sort((a, b) => {
@@ -100,6 +136,8 @@ export function filterReferencePosts(
         return b.impressions - a.impressions;
       case "engagement":
         return b.engagements - a.engagements || b.engagementRate - a.engagementRate;
+      case "likes":
+        return b.likes - a.likes;
       case "comments":
         return b.comments - a.comments;
       case "saves":
@@ -121,6 +159,7 @@ function metricLine(post: TrendsPostSummary): string {
     `${formatCompactNumber(post.impressions)} impressions`,
     `${post.engagementRate.toFixed(1)}% eng rate`,
     `${formatCompactNumber(post.engagements)} engagements`,
+    `${formatCompactNumber(post.likes)} likes`,
     `${formatCompactNumber(post.comments)} comments`,
     `${formatCompactNumber(post.saves)} saves`,
     `${formatCompactNumber(post.sends)} sends`,
@@ -153,6 +192,12 @@ export function buildReferenceMarkdown(
     `- **Period:** ${periodLabel}`,
     `- **Ranked by:** ${rankLabel}`,
     `- **Posts included:** ${posts.length}`,
+  ];
+  const kw = filters.keyword?.trim();
+  if (kw) {
+    lines.push(`- **Keyword:** “${kw}”`);
+  }
+  lines.push(
     "",
     "## How to use",
     "",
@@ -164,7 +209,7 @@ export function buildReferenceMarkdown(
     "",
     "## Posts",
     "",
-  ];
+  );
 
   if (posts.length === 0) {
     lines.push("_No posts matched these filters._", "");
@@ -188,7 +233,7 @@ export function buildReferenceMarkdown(
       );
     }
     lines.push("", "#### Caption", "", post.content.trim() || "_(empty)_", "");
-    const comments = [post.firstComment, post.secondComment]
+    const comments = [post.firstComment, post.secondComment, post.thirdComment]
       .map((c) => c?.trim())
       .filter((c): c is string => Boolean(c));
     if (comments.length) {
@@ -224,6 +269,8 @@ export function formatReferenceMetric(
       return formatCompactNumber(post.impressions);
     case "engagement":
       return `${post.engagementRate.toFixed(1)}% · ${formatCompactNumber(post.engagements)}`;
+    case "likes":
+      return formatCompactNumber(post.likes);
     case "comments":
       return formatCompactNumber(post.comments);
     case "saves":

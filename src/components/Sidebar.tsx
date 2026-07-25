@@ -16,7 +16,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/composer", label: "Composer", icon: PenLine },
   { href: "/repository", label: "Content Library", icon: Library },
-  { href: "/trends", label: "Trends", icon: ChartNoAxesCombined },
+  { href: "/data", label: "Data", icon: ChartNoAxesCombined },
   { href: "/radar", label: "Radar", icon: Radar },
   { href: "/engage", label: "Engage", icon: MessageCircle },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -41,15 +41,11 @@ export function Sidebar({ active }: { active: string }) {
               href={item.href}
               className={
                 isActive
-                  ? "flex h-10 items-center gap-2 rounded-lg bg-[var(--accent-soft)] pl-3 text-sm font-semibold text-[var(--accent)] transition"
+                  ? "flex h-10 items-center gap-2.5 rounded-lg bg-[var(--accent-soft)] pl-3 text-sm font-semibold text-[var(--accent)] transition"
                   : "flex h-10 items-center gap-2.5 rounded-lg pl-3 text-sm font-medium text-[var(--ink)] transition hover:bg-[var(--bg)]"
               }
             >
-              <Icon
-                className={isActive ? "size-[18px] shrink-0" : "size-4 shrink-0"}
-                strokeWidth={isActive ? 1.6 : 1.2}
-                aria-hidden
-              />
+              <Icon className="size-4 shrink-0" strokeWidth={1.2} aria-hidden />
               {item.label}
             </Link>
           );

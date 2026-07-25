@@ -1,13 +1,6 @@
-import { AppShell } from "@/components/AppShell";
-import { TrendsView } from "@/components/TrendsView";
-import { getTrendsDashboard } from "@/lib/trends";
+import { redirect } from "next/navigation";
 
-export default async function TrendsPage() {
-  const data = await getTrendsDashboard();
-
-  return (
-    <AppShell active="/trends" title="Trends">
-      <TrendsView data={data} />
-    </AppShell>
-  );
+/** Old Trends URL — keep bookmarks working. */
+export default function TrendsRedirectPage() {
+  redirect("/data");
 }

@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { extractHashtags, formatCompactNumber } from "@/lib/calendar-format";
+import { HashtagTag } from "@/components/HashtagTag";
 
 /** Matches Figma calendar post-preview-card (552×553). */
 const CARD_WIDTH_CLASS = "w-full max-w-[34.5rem]";
@@ -26,6 +27,7 @@ export type PostPreviewData = {
   mediaTitle?: string | null;
   firstComment?: string | null;
   secondComment?: string | null;
+  thirdComment?: string | null;
   topics?: string;
   authorName?: string;
   authorHeadline?: string;
@@ -35,6 +37,7 @@ export type PostPreviewStats = {
   impressions: number;
   engagementRate: number;
   engagements: number;
+  likes: number;
   comments: number;
   saves: number;
   sends: number;
@@ -46,10 +49,11 @@ type PostPreviewModalProps = {
   onClose: () => void;
   /** When set (e.g. Trends leaders), sticky strip above the scroll body. */
   stats?: PostPreviewStats | null;
+  onHashtagClick?: (tag: string) => void;
 };
 
 function commentList(post: PostPreviewData) {
-  return [post.firstComment, post.secondComment]
+  return [post.firstComment, post.secondComment, post.thirdComment]
     .map((c) => c?.trim())
     .filter((c): c is string => Boolean(c));
 }
@@ -234,12 +238,13 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
 
 function StatsStrip({ stats }: { stats: PostPreviewStats }) {
   return (
-    <section className="grid shrink-0 grid-cols-4 gap-2 border-b border-[var(--line)] bg-[var(--bg)] px-4 py-3 sm:grid-cols-7">
+    <section className="grid shrink-0 grid-cols-4 gap-2 border-b border-[var(--line)] bg-[var(--bg)] px-4 py-3 sm:grid-cols-4 lg:grid-cols-8">
       {(
         [
           ["Impr", formatCompactNumber(stats.impressions)],
           ["Eng %", `${stats.engagementRate.toFixed(1)}%`],
           ["Eng", formatCompactNumber(stats.engagements)],
+          ["Likes", formatCompactNumber(stats.likes)],
           ["Comments", formatCompactNumber(stats.comments)],
           ["Saves", formatCompactNumber(stats.saves)],
           ["Sends", formatCompactNumber(stats.sends)],
@@ -262,9 +267,11 @@ function StatsStrip({ stats }: { stats: PostPreviewStats }) {
 function CaptionBlock({
   caption,
   hashtags,
+  onHashtagClick,
 }: {
   caption: string;
   hashtags: string[];
+  onHashtagClick?: (tag: string) => void;
 }) {
   const canExpand = captionNeedsExpand(caption);
   const [expanded, setExpanded] = useState(false);
@@ -289,11 +296,20 @@ function CaptionBlock({
         </button>
       ) : null}
       {hashtags.length > 0 ? (
-        <p className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-[13px] font-medium text-[var(--accent)]">
-          {hashtags.map((tag) => (
-            <span key={tag}>{tag}</span>
-          ))}
-        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {hashtags.map((tag) =>
+            onHashtagClick ? (
+              <HashtagTag key={tag} tag={tag} onClick={onHashtagClick} />
+            ) : (
+              <span
+                key={tag}
+                className="text-[13px] font-medium text-[var(--accent)]"
+              >
+                {tag}
+              </span>
+            ),
+          )}
+        </div>
       ) : null}
     </section>
   );
@@ -303,6 +319,7 @@ export function PostPreviewModal({
   post,
   onClose,
   stats,
+  onHashtagClick,
 }: PostPreviewModalProps) {
   const comments = commentList(post);
   const hashtags = useMemo(
@@ -377,6 +394,7 @@ export function PostPreviewModal({
             key={post.id}
             caption={caption}
             hashtags={hashtags}
+            onHashtagClick={onHashtagClick}
           />
 
           {footer ? (

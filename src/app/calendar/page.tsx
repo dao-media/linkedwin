@@ -1,12 +1,10 @@
-import {
-  CalendarClient,
-} from "@/components/CalendarClient";
+import { desc } from "drizzle-orm";
+import { CalendarClient } from "@/components/CalendarClient";
 import type { CalendarRow } from "@/components/CalendarTable";
 import type { HashtagPostSummary } from "@/components/HashtagPostsModal";
 import { isCompleteStillVisible } from "@/lib/calendar-format";
 import { db, ensureSchema } from "@/lib/db";
-import { posts } from "@/lib/schema";
-import { desc } from "drizzle-orm";
+import { metricsSnapshots, posts } from "@/lib/schema";
 
 function toRow(p: typeof posts.$inferSelect): CalendarRow {
   return {
@@ -22,18 +20,7 @@ function toRow(p: typeof posts.$inferSelect): CalendarRow {
     mediaTitle: p.mediaTitle,
     firstComment: p.firstComment,
     secondComment: p.secondComment,
-  };
-}
-
-function toLibrarySummary(p: typeof posts.$inferSelect): HashtagPostSummary {
-  return {
-    id: p.id,
-    title: p.title,
-    content: p.content,
-    status: p.status,
-    topics: p.topics,
-    scheduledFor: p.scheduledFor,
-    publishedAt: p.publishedAt,
+    thirdComment: p.thirdComment,
   };
 }
 
@@ -44,6 +31,17 @@ export default async function CalendarPage() {
     .from(posts)
     .orderBy(desc(posts.createdAt))
     .all();
+
+  const snaps = await db
+    .select()
+    .from(metricsSnapshots)
+    .orderBy(desc(metricsSnapshots.capturedAt))
+    .all();
+  const impressionsByPost = new Map<string, number>();
+  for (const snap of snaps) {
+    if (impressionsByPost.has(snap.postId)) continue;
+    impressionsByPost.set(snap.postId, snap.impressions ?? 0);
+  }
 
   const drafts = all.filter((p) => p.status === "draft").map(toRow);
 
@@ -62,7 +60,16 @@ export default async function CalendarPage() {
     })
     .map(toRow);
 
-  const libraryPosts = all.map(toLibrarySummary);
+  const libraryPosts: HashtagPostSummary[] = all.map((p) => ({
+    id: p.id,
+    title: p.title,
+    content: p.content,
+    status: p.status,
+    topics: p.topics,
+    scheduledFor: p.scheduledFor,
+    publishedAt: p.publishedAt,
+    impressions: impressionsByPost.get(p.id) ?? null,
+  }));
 
   return (
     <CalendarClient

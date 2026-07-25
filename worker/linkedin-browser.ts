@@ -43,17 +43,26 @@ async function loadPlaywright() {
 
 async function withContext<T>(fn: (ctx: BrowserContext) => Promise<T>) {
   const raw = await getSetting("linkedin_session");
-  if (!raw) throw new Error("No linkedin_session in settings");
+  const { parseStoredLinkedInSession } = await import(
+    "../src/lib/linkedin-session"
+  );
+  const storage = parseStoredLinkedInSession(raw);
+  if (!storage) {
+    await setSetting("session_health", "expired");
+    throw new Error(
+      "LinkedIn browser session missing/corrupted — paste fresh storageState JSON in Settings",
+    );
+  }
 
   const { chromium } = await loadPlaywright();
   const browser = await chromium.launch({
     headless: process.env.PLAYWRIGHT_HEADLESS !== "false",
   });
   try {
-    const storage = JSON.parse(raw);
     const ctx = await browser.newContext({ storageState: storage });
     const result = await fn(ctx);
     const next = await ctx.storageState();
+    // Always persist via JSON.stringify — never String(next)
     await setSetting("linkedin_session", JSON.stringify(next));
     await setSetting("session_health", "healthy");
     await ctx.close();

@@ -53,9 +53,10 @@ export function CalendarClient({
               strokeWidth={1.2}
               aria-hidden
             />
-            Click a row to select, click again to edit date/time. Click a
-            hashtag tag to see all posts using it. Complete posts stay listed
-            only for the rest of their publish day.
+            Click a row to select. Hover and use the pencil on the date cell to
+            edit date/time. Hover a caption and click Edit for the full editor
+            (emojis, footers, @mentions, comments). Click a hashtag to see matching
+            posts. Complete posts stay listed only for the rest of their publish day.
           </p>
           <CalendarTable
             scheduled={scheduled}

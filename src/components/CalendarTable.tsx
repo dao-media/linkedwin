@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Expand, Save, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Expand, Pencil, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   countFirstComments,
@@ -22,9 +22,9 @@ import {
 } from "@/components/HashtagPostsModal";
 import { HashtagTag } from "@/components/HashtagTag";
 import {
-  PostPreviewModal,
-  type PostPreviewData,
-} from "@/components/PostPreviewModal";
+  PostEditorModal,
+  type PostEditorData,
+} from "@/components/PostEditorModal";
 
 export type CalendarRow = {
   id: string;
@@ -40,6 +40,7 @@ export type CalendarRow = {
   mediaTitle?: string | null;
   firstComment?: string | null;
   secondComment?: string | null;
+  thirdComment?: string | null;
 };
 
 function splitDateTime(iso: string | null) {
@@ -82,7 +83,7 @@ type EditController = {
   cancelEdit: () => void;
   saveCurrent: () => Promise<void>;
   openHashtag: (tag: string) => void;
-  openPreview: (row: CalendarRow) => void;
+  openEditor: (row: CalendarRow) => void;
 };
 
 function PostTable({
@@ -111,7 +112,7 @@ function PostTable({
     cancelEdit,
     saveCurrent,
     openHashtag,
-    openPreview,
+    openEditor,
   } = edit;
 
   return (
@@ -121,14 +122,22 @@ function PostTable({
           {error}
         </div>
       )}
-      <table className="w-full text-left text-sm">
+      <table className="w-full table-fixed text-left text-sm">
+        <colgroup>
+          <col className="w-[10.5rem]" />
+          <col className="w-[7.5rem]" />
+          <col className="w-[8.75rem]" />
+          <col className="w-[5.5rem]" />
+          <col className="w-[6.5rem]" />
+          <col />
+          <col className="w-[7.5rem]" />
+          {showScheduleAction ? <col className="w-[6.5rem]" /> : null}
+        </colgroup>
         <thead className="bg-[var(--bg)] text-[var(--muted)]">
           <tr>
             <th className="px-4 py-3 text-left font-semibold">Date</th>
             <th className="px-4 py-3 text-left font-semibold">Time</th>
-            <th className="w-[8.75rem] max-w-[8.75rem] px-4 py-3 text-left font-semibold">
-              Post caption
-            </th>
+            <th className="px-4 py-3 text-left font-semibold">Post caption</th>
             <th className="px-4 py-3 text-left font-semibold">Media</th>
             <th className="px-4 py-3 text-left font-semibold">Status</th>
             <th className="px-4 py-3 text-left font-semibold">Hashtags</th>
@@ -153,50 +162,64 @@ function PostTable({
             const commentCount = countFirstComments(
               row.firstComment,
               row.secondComment,
+              row.thirdComment,
             );
             const caption = truncateCaption(row.title || row.content);
 
             return (
               <tr
                 key={row.id}
-                className={`border-t border-[var(--line)] ${
+                className={`group/row border-t border-[var(--line)] ${
                   selected || editing ? "bg-[var(--accent-soft)]" : ""
                 }`}
                 onClick={() => {
                   if (editing || saving) return;
-                  if (selectedId === row.id) {
-                    void beginEdit(row.id, date, time);
-                  } else {
-                    void selectRow(row.id);
-                  }
+                  void selectRow(row.id);
                 }}
               >
-                <td className="whitespace-nowrap px-4 py-3 text-left">
+                <td className="relative whitespace-nowrap px-4 py-3 pr-9 text-left">
                   {editing ? (
                     <input
                       type="date"
-                      className="rounded-md border border-[var(--accent)] bg-white px-2 py-1 text-left"
+                      className="box-border w-full min-w-0 rounded-md border border-[var(--accent)] bg-white px-2 py-1 text-left"
                       value={draftDate}
                       onChange={(e) => setDraftDate(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <span
-                      className={
-                        selected
-                          ? "inline-block rounded-md border border-[var(--accent)] bg-[var(--selected)] px-2 py-1 text-left"
-                          : "text-left"
-                      }
-                    >
-                      {displayDate || "—"}
-                    </span>
+                    <>
+                      <span
+                        className={
+                          selected
+                            ? "inline-block max-w-full truncate rounded-md border border-[var(--accent)] bg-[var(--selected)] px-2 py-1 text-left"
+                            : "text-left"
+                        }
+                      >
+                        {displayDate || "—"}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Edit schedule for ${caption || "post"}`}
+                        className="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--line)] bg-white text-[var(--muted)] opacity-0 shadow-sm transition group-hover/row:opacity-100 hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void beginEdit(row.id, date, time);
+                        }}
+                      >
+                        <Pencil
+                          className="size-3.5"
+                          strokeWidth={1.2}
+                          aria-hidden
+                        />
+                      </button>
+                    </>
                   )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-left">
                   {editing ? (
                     <input
                       type="time"
-                      className="rounded-md border border-[var(--accent)] bg-white px-2 py-1 text-left"
+                      className="box-border w-full min-w-0 rounded-md border border-[var(--accent)] bg-white px-2 py-1 text-left"
                       value={draftTime}
                       onChange={(e) => setDraftTime(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -205,7 +228,7 @@ function PostTable({
                     <span
                       className={
                         selected
-                          ? "inline-block rounded-md border border-[var(--accent)] bg-[var(--selected)] px-2 py-1 text-left"
+                          ? "inline-block max-w-full truncate rounded-md border border-[var(--accent)] bg-[var(--selected)] px-2 py-1 text-left"
                           : "text-left"
                       }
                     >
@@ -214,7 +237,7 @@ function PostTable({
                   )}
                 </td>
                 <td
-                  className="group relative w-[8.75rem] max-w-[8.75rem] px-4 py-3 text-left"
+                  className="group relative px-4 py-3 text-left"
                   title={row.title || row.content}
                 >
                   <span className="block truncate pr-1">{caption || "—"}</span>
@@ -224,11 +247,11 @@ function PostTable({
                       className="absolute inset-y-1 right-1 inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)] opacity-0 shadow-sm transition group-hover:opacity-100 focus-visible:opacity-100"
                       onClick={(e) => {
                         e.stopPropagation();
-                        openPreview(row);
+                        openEditor(row);
                       }}
                     >
                       <Expand className="size-3.5 shrink-0" strokeWidth={1.2} aria-hidden />
-                      Preview
+                      Edit
                     </button>
                   )}
                 </td>
@@ -336,14 +359,17 @@ export function CalendarTable({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeHashtag, setActiveHashtag] = useState<string | null>(null);
-  const [previewPost, setPreviewPost] = useState<PostPreviewData | null>(null);
+  const [editorPost, setEditorPost] = useState<PostEditorData | null>(null);
 
   const draftDateRef = useRef(draftDate);
   const draftTimeRef = useRef(draftTime);
   const editingIdRef = useRef(editingId);
-  draftDateRef.current = draftDate;
-  draftTimeRef.current = draftTime;
-  editingIdRef.current = editingId;
+
+  useEffect(() => {
+    draftDateRef.current = draftDate;
+    draftTimeRef.current = draftTime;
+    editingIdRef.current = editingId;
+  }, [draftDate, draftTime, editingId]);
 
   const matchingPosts = useMemo(() => {
     if (!activeHashtag) return [];
@@ -434,17 +460,18 @@ export function CalendarTable({
     setActiveHashtag(formatHashtagLabel(tag));
   }, []);
 
-  const openPreview = useCallback((row: CalendarRow) => {
-    setPreviewPost({
+  const openEditor = useCallback((row: CalendarRow) => {
+    setEditorPost({
       id: row.id,
       title: row.title,
       content: row.content,
-      footer: row.footer,
+      status: row.status,
       mediaType: row.mediaType,
       mediaUrl: row.mediaUrl,
       mediaTitle: row.mediaTitle,
       firstComment: row.firstComment,
       secondComment: row.secondComment,
+      thirdComment: row.thirdComment,
       topics: row.topics,
     });
   }, []);
@@ -469,7 +496,7 @@ export function CalendarTable({
     cancelEdit,
     saveCurrent,
     openHashtag,
-    openPreview,
+    openEditor,
   };
 
   return (
@@ -503,10 +530,14 @@ export function CalendarTable({
           onClose={() => setActiveHashtag(null)}
         />
       )}
-      {previewPost && (
-        <PostPreviewModal
-          post={previewPost}
-          onClose={() => setPreviewPost(null)}
+      {editorPost && (
+        <PostEditorModal
+          post={editorPost}
+          onClose={() => setEditorPost(null)}
+          onSaved={() => {
+            setEditorPost(null);
+            router.refresh();
+          }}
         />
       )}
     </div>

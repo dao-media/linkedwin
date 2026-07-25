@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { syncAllRecentMetrics } from "@/lib/jobs";
+import { syncFromZernio } from "@/lib/sync";
 
 function authorized(req: Request) {
   const secret = process.env.CRON_SECRET ?? process.env.WORKER_SECRET;
@@ -12,6 +12,6 @@ export async function GET(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await syncAllRecentMetrics();
+  const result = await syncFromZernio();
   return NextResponse.json(result);
 }

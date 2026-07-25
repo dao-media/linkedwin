@@ -17,5 +17,5 @@ primary_region = "iad"
 [processes]
   worker = "npx tsx worker/process-jobs.ts"
 
-# Schedule via external cron hitting the app /api/worker/run or run as a
-# short-lived machine. Prefer Vercel cron → /api/worker/run for lowest cost.
+# Long-running poller — keep one machine up, or hit /api/worker/run from
+# Vercel cron (metrics only on Vercel; browser jobs stay pending for this worker).

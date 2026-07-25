@@ -3,17 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -k -n web,worker -c blue,magenta \"next dev\" \"tsx worker/process-jobs.ts\"",
+    "dev:web": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:app": "concurrently -k -n web,worker -c blue,magenta \"next start\" \"tsx worker/process-jobs.ts\"",
     "lint": "eslint",
     "db:seed": "tsx scripts/seed.ts",
+    "import:favikon": "tsx scripts/import-favikon.ts",
+    "import:linkedin": "tsx scripts/import-linkedin-analytics.ts",
+    "enrich:posts": "tsx scripts/enrich-posts-from-imports.ts",
+    "session:capture": "tsx scripts/capture-linkedin-session.ts",
+    "session:restore": "tsx scripts/restore-linkedin-session.ts",
     "worker": "tsx worker/process-jobs.ts",
-    "worker:dry": "WORKER_DRY_RUN=true tsx worker/process-jobs.ts"
+    "worker:once": "tsx worker/process-jobs.ts --once",
+    "worker:dry": "WORKER_DRY_RUN=true tsx worker/process-jobs.ts --once"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.6.1",
     "@zernio/node": "^0.2.419",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
@@ -24,6 +33,7 @@
     "react-dom": "19.2.4",
     "recharts": "^3.10.0",
     "uuid": "^14.0.1",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -32,6 +42,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "concurrently": "^10.0.4",
+    "csv-parse": "^7.0.1",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",

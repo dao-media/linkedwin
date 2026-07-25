@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BookOpen, Download } from "lucide-react";
+import { BookOpen, Download, Search, X } from "lucide-react";
 import { PeriodChips } from "@/components/PeriodChips";
-import type { TrendsPostSummary } from "@/lib/trends";
+import type { TrendsPostSummary } from "@/lib/trends-shared";
 import {
   REFERENCE_COUNT_OPTIONS,
   REFERENCE_RANK_OPTIONS,
@@ -32,6 +32,7 @@ function ReferenceSelection({
     period: TrendsPeriodId;
     rankBy: ReferenceRankId;
     count: ReferenceCount;
+    keyword: string;
   };
 }) {
   const [selectedIds, setSelectedIds] = useState(
@@ -142,10 +143,11 @@ export function TrendsReferenceExport({
   const [period, setPeriod] = useState<TrendsPeriodId>("month");
   const [rankBy, setRankBy] = useState<ReferenceRankId>("impressions");
   const [count, setCount] = useState<ReferenceCount>(10);
+  const [keyword, setKeyword] = useState("");
 
   const filters = useMemo(
-    () => ({ period, rankBy, count }),
-    [period, rankBy, count],
+    () => ({ period, rankBy, count, keyword }),
+    [period, rankBy, count, keyword],
   );
 
   const candidates = useMemo(
@@ -153,7 +155,7 @@ export function TrendsReferenceExport({
     [posts, filters],
   );
 
-  const selectionKey = `${period}|${rankBy}|${count}|${candidates.map((c) => c.id).join(",")}`;
+  const selectionKey = `${period}|${rankBy}|${count}|${keyword.trim().toLowerCase()}|${candidates.map((c) => c.id).join(",")}`;
 
   return (
     <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -211,6 +213,36 @@ export function TrendsReferenceExport({
             onChange={(id) => setCount(Number(id) as ReferenceCount)}
             ariaLabel="Reference export count"
           />
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <span className="w-20 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Keyword
+          </span>
+          <div className="relative min-w-0 flex-1">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--muted)]"
+              strokeWidth={1.2}
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="Search caption, hashtags, comments…"
+              aria-label="Filter reference posts by keyword"
+              className="w-full rounded-lg border border-[var(--line)] bg-white py-2 pl-9 pr-9 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)]"
+            />
+            {keyword ? (
+              <button
+                type="button"
+                onClick={() => setKeyword("")}
+                aria-label="Clear keyword"
+                className="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
+              >
+                <X className="size-3.5" strokeWidth={1.2} aria-hidden />
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 

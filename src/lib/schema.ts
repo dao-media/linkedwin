@@ -19,6 +19,7 @@ export const posts = sqliteTable("posts", {
   mediaTitle: text("media_title"),
   firstComment: text("first_comment"),
   secondComment: text("second_comment"),
+  thirdComment: text("third_comment"),
   repostAfterHours: integer("repost_after_hours").default(12),
   repostEnabled: integer("repost_enabled", { mode: "boolean" }).default(true),
   zernioPostId: text("zernio_post_id"),
@@ -59,7 +60,7 @@ export const automationJobs = sqliteTable("automation_jobs", {
   postId: text("post_id")
     .notNull()
     .references(() => posts.id),
-  type: text("type").notNull(), // first_comment | second_comment | repost | metrics_sync
+  type: text("type").notNull(), // second_comment | third_comment | repost | metrics_sync
   runAt: text("run_at").notNull(),
   status: text("status").notNull().default("pending"), // pending | running | done | failed
   attempts: integer("attempts").notNull().default(0),
@@ -140,5 +141,21 @@ export const followerSnapshots = sqliteTable("follower_snapshots", {
     .notNull()
     .default(sql`(datetime('now'))`),
   followers: integer("followers").notNull(),
-  source: text("source").notNull().default("settings"), // settings | publish
+  source: text("source").notNull().default("settings"), // settings | publish | linkedin_export | zernio
+});
+
+/**
+ * Account-level daily series from LinkedIn AggregateAnalytics (pre-Zernio)
+ * or future sync. Powers Trends impression/engagement charts.
+ */
+export const dailyMetrics = sqliteTable("daily_metrics", {
+  id: text("id").primaryKey(),
+  date: text("date").notNull(), // YYYY-MM-DD
+  impressions: integer("impressions").notNull().default(0),
+  engagements: integer("engagements").notNull().default(0),
+  newFollowers: integer("new_followers").notNull().default(0),
+  source: text("source").notNull().default("linkedin_export"),
+  capturedAt: text("captured_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
 });

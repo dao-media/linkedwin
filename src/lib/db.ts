@@ -35,6 +35,7 @@ export async function ensureSchema() {
       media_title TEXT,
       first_comment TEXT,
       second_comment TEXT,
+      third_comment TEXT,
       repost_after_hours INTEGER DEFAULT 12,
       repost_enabled INTEGER DEFAULT 1,
       zernio_post_id TEXT,
@@ -130,11 +131,24 @@ export async function ensureSchema() {
       followers INTEGER NOT NULL,
       source TEXT NOT NULL DEFAULT 'settings'
     );
+
+    CREATE TABLE IF NOT EXISTS daily_metrics (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      impressions INTEGER NOT NULL DEFAULT 0,
+      engagements INTEGER NOT NULL DEFAULT 0,
+      new_followers INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'linkedin_export',
+      captured_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS daily_metrics_date_idx ON daily_metrics(date);
   `);
 
   // Additive columns for existing databases (CREATE IF NOT EXISTS won't alter).
   const alters = [
     "ALTER TABLE posts ADD COLUMN followers_at_publish INTEGER",
+    "ALTER TABLE posts ADD COLUMN third_comment TEXT",
     "ALTER TABLE metrics_snapshots ADD COLUMN saves INTEGER DEFAULT 0",
     "ALTER TABLE metrics_snapshots ADD COLUMN sends INTEGER DEFAULT 0",
     "ALTER TABLE metrics_snapshots ADD COLUMN reposts INTEGER DEFAULT 0",

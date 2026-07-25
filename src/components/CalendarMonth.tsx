@@ -15,6 +15,10 @@ import {
 import { ChevronLeft, ChevronRight, FileText, Image as ImageIcon, Link2, MessageCircle, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { CalendarRow } from "@/components/CalendarTable";
+import {
+  PostEditorModal,
+  type PostEditorData,
+} from "@/components/PostEditorModal";
 import { ScheduleTimeModal } from "@/components/ScheduleTimeModal";
 import {
   countFirstComments,
@@ -115,6 +119,8 @@ export function CalendarMonth({
   const [pending, setPending] = useState<PendingDrop | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editorPost, setEditorPost] = useState<PostEditorData | null>(null);
+  const [didDrag, setDidDrag] = useState(false);
 
   const postsByDate = useMemo(() => {
     const map = new Map<string, CalendarRow[]>();
@@ -275,6 +281,7 @@ export function CalendarMonth({
                     const commentCount = countFirstComments(
                       row.firstComment,
                       row.secondComment,
+                      row.thirdComment,
                     );
                     return (
                       <div
@@ -285,18 +292,36 @@ export function CalendarMonth({
                             e.preventDefault();
                             return;
                           }
+                          setDidDrag(false);
                           e.dataTransfer.setData(DRAG_TYPE, row.id);
                           e.dataTransfer.effectAllowed = "move";
                           setDraggingId(row.id);
                         }}
+                        onDrag={() => setDidDrag(true)}
                         onDragEnd={() => {
                           setDraggingId(null);
                           setDropTarget(null);
                         }}
+                        onClick={() => {
+                          if (didDrag) return;
+                          setEditorPost({
+                            id: row.id,
+                            title: row.title,
+                            content: row.content,
+                            status: row.status,
+                            mediaType: row.mediaType,
+                            mediaUrl: row.mediaUrl,
+                            mediaTitle: row.mediaTitle,
+                            firstComment: row.firstComment,
+                            secondComment: row.secondComment,
+                            thirdComment: row.thirdComment,
+                            topics: row.topics,
+                          });
+                        }}
                         className={`cursor-grab rounded-md bg-[var(--accent-soft)] px-1.5 py-1 text-left active:cursor-grabbing ${
                           dragging ? "opacity-40" : ""
                         }`}
-                        title={postLabel(row)}
+                        title={`${postLabel(row)} — click to edit`}
                       >
                         <div className="flex items-center justify-between gap-1">
                           <div className="min-w-0 truncate text-[10px] font-semibold text-[var(--accent)]">
@@ -338,17 +363,36 @@ export function CalendarMonth({
                     key={row.id}
                     draggable
                     onDragStart={(e) => {
+                      setDidDrag(false);
                       e.dataTransfer.setData(DRAG_TYPE, row.id);
                       e.dataTransfer.effectAllowed = "move";
                       setDraggingId(row.id);
                     }}
+                    onDrag={() => setDidDrag(true)}
                     onDragEnd={() => {
                       setDraggingId(null);
                       setDropTarget(null);
                     }}
+                    onClick={() => {
+                      if (didDrag) return;
+                      setEditorPost({
+                        id: row.id,
+                        title: row.title,
+                        content: row.content,
+                        status: row.status,
+                        mediaType: row.mediaType,
+                        mediaUrl: row.mediaUrl,
+                        mediaTitle: row.mediaTitle,
+                        firstComment: row.firstComment,
+                        secondComment: row.secondComment,
+                        thirdComment: row.thirdComment,
+                        topics: row.topics,
+                      });
+                    }}
                     className={`flex cursor-grab items-center justify-between gap-3 border-t border-[var(--line)] px-4 py-3 first:border-t-0 active:cursor-grabbing ${
                       dragging ? "opacity-40" : ""
                     }`}
+                    title="Click to edit · drag onto a date to schedule"
                   >
                     <span className="min-w-0 truncate text-sm font-medium">
                       {postLabel(row)}
@@ -379,6 +423,16 @@ export function CalendarMonth({
             setError(null);
           }}
           onSave={(time) => void saveTime(time)}
+        />
+      )}
+      {editorPost && (
+        <PostEditorModal
+          post={editorPost}
+          onClose={() => setEditorPost(null)}
+          onSaved={() => {
+            setEditorPost(null);
+            router.refresh();
+          }}
         />
       )}
     </div>

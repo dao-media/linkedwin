@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { PeriodChips } from "@/components/PeriodChips";
-import type { TrendsSeriesPoint } from "@/lib/trends";
+import type { TrendsSeriesPoint } from "@/lib/trends-shared";
 import type { TrendsPeriodId } from "@/lib/trends-periods";
 import { formatCompactNumber } from "@/lib/calendar-format";
 
@@ -34,6 +34,8 @@ export function TrendsChartCard({
   formatValue?: (n: number) => string;
 }) {
   const fmt = formatValue ?? ((n: number) => `${formatCompactNumber(n)}${valueSuffix}`);
+  // Parentheses / special chars break SVG url(#id) fills — keep ids CSS-safe.
+  const gradientId = `fill-${title.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-|-$/g, "")}`;
 
   return (
     <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -60,7 +62,7 @@ export function TrendsChartCard({
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id={`fill-${title.replace(/\s+/g, "-")}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#0d598c" stopOpacity={0.35} />
                   <stop offset="100%" stopColor="#0d598c" stopOpacity={0.02} />
                 </linearGradient>
@@ -95,7 +97,7 @@ export function TrendsChartCard({
                 dataKey="value"
                 stroke="#0d598c"
                 strokeWidth={2}
-                fill={`url(#fill-${title.replace(/\s+/g, "-")})`}
+                fill={`url(#${gradientId})`}
                 dot={series.length <= 14}
                 activeDot={{ r: 4 }}
               />

@@ -59,9 +59,11 @@ https://www.figma.com/design/UqIRLh3FLJGrQUVTCDszLk/LinkedWin
 
 ## Capture LinkedIn session (worker)
 
-1. Locally: `npx playwright codegen linkedin.com` (log in)
-2. Export storage state JSON
-3. POST to `/api/settings` with `{ "linkedinSession": "<json>", "sessionHealth": "healthy" }`
+1. Locally: `npm run session:capture` (log in with **email + password**, not Google)
+2. Open `linkedin-session.json` and paste into Settings → Browser session
+3. Save and mark session healthy
+
+Avoid `Continue with Google` in Playwright — Google blocks OAuth in automated browsers.
 
 ## Gotchas
 

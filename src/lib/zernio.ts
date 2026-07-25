@@ -43,6 +43,34 @@ export async function listZernioAccounts() {
   return zernioFetch("/v1/accounts");
 }
 
+export async function getZernioAccount(accountId: string) {
+  try {
+    return await zernioFetch(`/v1/accounts/${accountId}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function getZernioFollowerStats(accountId?: string) {
+  const params = new URLSearchParams({ granularity: "daily" });
+  if (accountId) params.set("accountIds", accountId);
+  return zernioFetch(`/v1/accounts/follower-stats?${params.toString()}`);
+}
+
+export async function listZernioPosts(opts?: {
+  accountId?: string;
+  source?: "zernio" | "external";
+  page?: number;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts?.accountId) params.set("accountId", opts.accountId);
+  if (opts?.source) params.set("source", opts.source);
+  params.set("page", String(opts?.page ?? 1));
+  params.set("limit", String(opts?.limit ?? 50));
+  return zernioFetch(`/v1/posts?${params.toString()}`);
+}
+
 export async function scheduleLinkedInPost(input: SchedulePostInput) {
   const { accountId } = await getZernioConfig();
   if (!accountId) {
@@ -102,6 +130,77 @@ export async function updateZernioSchedule(
       scheduledFor,
       timezone: timezone ?? "America/New_York",
     }),
+  });
+}
+
+export type LinkedInMentionResult = {
+  urn: string;
+  type: string;
+  displayName?: string;
+  mentionFormat: string;
+};
+
+/** Resolve a LinkedIn profile/company URL to an embeddable @mention format. */
+export async function resolveLinkedInMention(input: {
+  url: string;
+  displayName?: string;
+}) {
+  const { accountId } = await getZernioConfig();
+  if (!accountId) {
+    throw new Error("Zernio LinkedIn account ID not configured");
+  }
+  const params = new URLSearchParams({ url: input.url });
+  if (input.displayName?.trim()) {
+    params.set("displayName", input.displayName.trim());
+  }
+  return zernioFetch(
+    `/v1/accounts/${accountId}/linkedin-mentions?${params.toString()}`,
+  ) as Promise<LinkedInMentionResult>;
+}
+
+export async function updateZernioPost(
+  zernioPostId: string,
+  input: {
+    content?: string;
+    firstComment?: string | null;
+    tags?: string[];
+    mediaType?: "image" | "video" | "document" | null;
+    mediaUrl?: string | null;
+    mediaTitle?: string | null;
+  },
+) {
+  const body: Record<string, unknown> = {};
+  if (input.content !== undefined) body.content = input.content;
+  if (input.tags !== undefined) body.tags = input.tags;
+
+  if (input.mediaUrl && input.mediaType) {
+    body.mediaItems = [
+      {
+        type: input.mediaType,
+        url: input.mediaUrl,
+        title: input.mediaTitle ?? undefined,
+      },
+    ];
+  }
+
+  if (input.firstComment !== undefined) {
+    const { accountId } = await getZernioConfig();
+    if (accountId) {
+      body.platforms = [
+        {
+          platform: "linkedin",
+          accountId,
+          platformSpecificData: input.firstComment
+            ? { firstComment: input.firstComment }
+            : {},
+        },
+      ];
+    }
+  }
+
+  return zernioFetch(`/v1/posts/${zernioPostId}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
   });
 }
 

@@ -2,12 +2,16 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import {
   extractHashtags,
-  formatCompactNumber,
   normalizeHashtagKey,
 } from "./calendar-format";
 import { db, ensureSchema } from "./db";
 import {
+  computeEngagementRate,
+  impressionsSourceFromRaw,
+} from "./metrics";
+import {
   automationJobs,
+  dailyMetrics,
   followerSnapshots,
   metricsSnapshots,
   posts,
@@ -15,42 +19,19 @@ import {
 import { getSetting } from "./settings";
 import type { TrendsPeriodId } from "./trends-periods";
 import { periodStartIso } from "./trends-periods";
+import type {
+  TrendsHashtagRow,
+  TrendsPostSummary,
+  TrendsSeriesPoint,
+} from "./trends-shared";
 
-export type TrendsSeriesPoint = {
-  date: string;
-  label: string;
-  value: number;
-};
-
-export type TrendsPostSummary = {
-  id: string;
-  title: string;
-  content: string;
-  footer?: string | null;
-  mediaType?: string | null;
-  mediaUrl?: string | null;
-  mediaTitle?: string | null;
-  firstComment?: string | null;
-  secondComment?: string | null;
-  topics?: string;
-  publishedAt: string | null;
-  impressions: number;
-  likes: number;
-  comments: number;
-  shares: number;
-  saves: number;
-  sends: number;
-  reposts: number;
-  organicReposts: number;
-  engagements: number;
-  engagementRate: number;
-};
-
-export type TrendsHashtagRow = {
-  tag: string;
-  impressions: number;
-  posts: number;
-};
+export type {
+  TrendsHashtagRow,
+  TrendsPostSummary,
+  TrendsSeriesPoint,
+  TrendsDashboard,
+} from "./trends-shared";
+export { formatFollowersDelta } from "./trends-shared";
 
 type PostMetrics = {
   post: typeof posts.$inferSelect;
@@ -112,6 +93,7 @@ function toSummary(row: PostMetrics): TrendsPostSummary {
     mediaTitle: row.post.mediaTitle,
     firstComment: row.post.firstComment,
     secondComment: row.post.secondComment,
+    thirdComment: row.post.thirdComment,
     topics: row.post.topics,
     publishedAt: row.post.publishedAt,
     impressions: row.impressions,
@@ -129,7 +111,7 @@ function toSummary(row: PostMetrics): TrendsPostSummary {
 
 export async function recordFollowerSnapshot(
   followers: number,
-  source: "settings" | "publish" = "settings",
+  source: "settings" | "publish" | "zernio" = "settings",
   capturedAt = new Date().toISOString(),
 ) {
   if (!Number.isFinite(followers) || followers < 0) return;
@@ -140,11 +122,11 @@ export async function recordFollowerSnapshot(
     .orderBy(desc(followerSnapshots.capturedAt))
     .limit(1)
     .get();
-  // Avoid duplicate consecutive same values within ~12h for settings updates.
+  // Avoid duplicate consecutive same values within ~12h for settings/zernio updates.
   if (
     latest &&
     latest.followers === followers &&
-    source === "settings" &&
+    (source === "settings" || source === "zernio") &&
     Date.now() - new Date(latest.capturedAt).getTime() < 12 * 60 * 60 * 1000
   ) {
     return;
@@ -195,7 +177,11 @@ async function loadPublishedWithMetrics(): Promise<PostMetrics[]> {
     const organicReposts = Math.max(0, reposts - own);
     const engagements = likes + comments + shares + saves + sends;
     const engagementRate =
-      impressions > 0 ? (engagements / impressions) * 100 : 0;
+      computeEngagementRate({
+        engagements,
+        impressions,
+        impressionsSource: impressionsSourceFromRaw(snap?.rawJson),
+      }) ?? 0;
     out.push({
       post,
       impressions,
@@ -264,6 +250,66 @@ function buildDailyImpressions(
   return seriesFromBuckets(buckets, "day");
 }
 
+/** Prefer LinkedIn account-level daily series when imported. */
+function buildDailyImpressionsFromAccount(
+  days: { date: string; impressions: number }[],
+  periodId: TrendsPeriodId,
+): TrendsSeriesPoint[] {
+  const start = periodStartIso(periodId);
+  const buckets = new Map<string, number>();
+  for (const d of days) {
+    const iso = `${d.date}T12:00:00.000Z`;
+    if (!inRange(iso, start)) continue;
+    buckets.set(d.date, d.impressions);
+  }
+  return seriesFromBuckets(buckets, "day");
+}
+
+function buildWeeklyFromDaily(
+  days: { date: string; value: number }[],
+  periodId: TrendsPeriodId,
+  mode: "sum" | "avg",
+): TrendsSeriesPoint[] {
+  const start = periodStartIso(periodId);
+  const week = new Map<string, { total: number; n: number }>();
+  for (const d of days) {
+    const iso = `${d.date}T12:00:00.000Z`;
+    if (!inRange(iso, start)) continue;
+    const k = weekKey(iso);
+    const cur = week.get(k) ?? { total: 0, n: 0 };
+    cur.total += d.value;
+    cur.n += 1;
+    week.set(k, cur);
+  }
+  const buckets = new Map<string, number>();
+  for (const [k, v] of week) {
+    buckets.set(k, mode === "avg" ? (v.n > 0 ? v.total / v.n : 0) : v.total);
+  }
+  return seriesFromBuckets(buckets, "week");
+}
+
+function buildWeeklyEngagementFromDaily(
+  days: { date: string; impressions: number; engagements: number }[],
+  periodId: TrendsPeriodId,
+): TrendsSeriesPoint[] {
+  const start = periodStartIso(periodId);
+  const week = new Map<string, { eng: number; impr: number }>();
+  for (const d of days) {
+    const iso = `${d.date}T12:00:00.000Z`;
+    if (!inRange(iso, start)) continue;
+    const k = weekKey(iso);
+    const cur = week.get(k) ?? { eng: 0, impr: 0 };
+    cur.eng += d.engagements;
+    cur.impr += d.impressions;
+    week.set(k, cur);
+  }
+  const buckets = new Map<string, number>();
+  for (const [k, v] of week) {
+    buckets.set(k, v.impr > 0 ? (v.eng / v.impr) * 100 : 0);
+  }
+  return seriesFromBuckets(buckets, "week");
+}
+
 function buildWeeklyAverageSeries(
   rows: PostMetrics[],
   periodId: TrendsPeriodId,
@@ -305,7 +351,7 @@ function topPosts(
   periodId: TrendsPeriodId,
   metric: keyof Pick<
     PostMetrics,
-    "impressions" | "engagements" | "comments" | "saves" | "sends"
+    "impressions" | "engagements" | "likes" | "comments" | "saves" | "sends"
   >,
   limit: number,
 ): TrendsPostSummary[] {
@@ -334,13 +380,26 @@ function topHashtags(
     }
   }
   return [...map.values()]
-    .sort((a, b) => b.impressions - a.impressions)
+    .map((row) => ({
+      tag: row.tag,
+      posts: row.posts,
+      avgImpressions:
+        row.posts > 0 ? row.impressions / row.posts : 0,
+    }))
+    .sort((a, b) => b.avgImpressions - a.avgImpressions)
     .slice(0, limit);
 }
 
 export async function getTrendsDashboard() {
   await ensureSchema();
   const rows = await loadPublishedWithMetrics();
+
+  const accountDays = await db
+    .select()
+    .from(dailyMetrics)
+    .orderBy(asc(dailyMetrics.date))
+    .all();
+  const hasAccountDays = accountDays.length > 0;
 
   // Seed follower history from publish stamps + stored snapshots + current setting.
   const snaps = await db
@@ -374,11 +433,27 @@ export async function getTrendsDashboard() {
   mergedFollowers.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
 
   const weekRows = filterByPeriod(rows, "week");
-  const avgImpressionsPerWeek = averageWeeklyImpressions(rows, "month");
+  const avgImpressionsPerWeek = hasAccountDays
+    ? averageOf(
+        buildWeeklyFromDaily(
+          accountDays.map((d) => ({
+            date: d.date,
+            value: d.impressions,
+          })),
+          "month",
+          "sum",
+        ).map((p) => p.value),
+      )
+    : averageWeeklyImpressions(rows, "month");
 
   const topOfWeek = weekRows
     .slice()
-    .sort((a, b) => b.impressions - a.impressions)[0];
+    .sort(
+      (a, b) =>
+        b.impressions - a.impressions ||
+        b.engagements - a.engagements ||
+        b.likes - a.likes,
+    )[0];
 
   const followerDeltaWeek = (() => {
     const start = periodStartIso("week");
@@ -405,6 +480,7 @@ export async function getTrendsDashboard() {
       {
         impressions: TrendsPostSummary[];
         engagement: TrendsPostSummary[];
+        likes: TrendsPostSummary[];
         comments: TrendsPostSummary[];
         saves: TrendsPostSummary[];
         sends: TrendsPostSummary[];
@@ -415,6 +491,7 @@ export async function getTrendsDashboard() {
       out[id] = {
         impressions: topPosts(rows, id, "impressions", 5),
         engagement: topPosts(rows, id, "engagements", 5),
+        likes: topPosts(rows, id, "likes", 5),
         comments: topPosts(rows, id, "comments", 5),
         saves: topPosts(rows, id, "saves", 5),
         sends: topPosts(rows, id, "sends", 5),
@@ -438,15 +515,31 @@ export async function getTrendsDashboard() {
       ),
       dailyImpressions: chartBundle(
         ["week", "month", "quarter"] as const,
-        (id) => buildDailyImpressions(rows, id),
+        (id) =>
+          hasAccountDays
+            ? buildDailyImpressionsFromAccount(accountDays, id)
+            : buildDailyImpressions(rows, id),
       ),
       weeklyImpressions: chartBundle(
         ["month", "quarter", "6mo", "year", "2yr", "all"] as const,
-        (id) => buildWeeklyAverageSeries(rows, id, (r) => r.impressions),
+        (id) =>
+          hasAccountDays
+            ? buildWeeklyFromDaily(
+                accountDays.map((d) => ({
+                  date: d.date,
+                  value: d.impressions,
+                })),
+                id,
+                "sum",
+              )
+            : buildWeeklyAverageSeries(rows, id, (r) => r.impressions),
       ),
       engagement: chartBundle(
         ["week", "month", "quarter", "6mo", "year", "2yr", "all"] as const,
-        (id) => buildWeeklyEngagementRate(rows, id),
+        (id) =>
+          hasAccountDays
+            ? buildWeeklyEngagementFromDaily(accountDays, id)
+            : buildWeeklyEngagementRate(rows, id),
       ),
       organicReposts: chartBundle(
         ["month", "quarter", "year", "all"] as const,
@@ -477,11 +570,4 @@ function averageWeeklyImpressions(
 ): number {
   const series = buildWeeklyAverageSeries(rows, periodId, (r) => r.impressions);
   return averageOf(series.map((p) => p.value));
-}
-
-export function formatFollowersDelta(delta: number | null | undefined): string | null {
-  if (delta == null || !Number.isFinite(delta)) return null;
-  if (delta === 0) return "Flat this week";
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${formatCompactNumber(delta)} this week`;
 }

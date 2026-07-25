@@ -6,6 +6,10 @@ import {
 } from "@/components/ContentLibraryTable";
 import { formatHashtagLabel } from "@/lib/calendar-format";
 import { db, ensureSchema } from "@/lib/db";
+import {
+  computeEngagementRate,
+  impressionsSourceFromRaw,
+} from "@/lib/metrics";
 import { metricsSnapshots, posts } from "@/lib/schema";
 
 type SearchParams = Promise<{ post?: string; tag?: string }>;
@@ -53,12 +57,11 @@ export default async function RepositoryPage({
           (saves ?? 0) +
           (sends ?? 0);
 
-    const engRate =
-      snap?.engagementRate != null
-        ? snap.engagementRate
-        : impressions && engagements != null && impressions > 0
-          ? (engagements / impressions) * 100
-          : null;
+    const engRate = computeEngagementRate({
+      engagements,
+      impressions,
+      impressionsSource: impressionsSourceFromRaw(snap?.rawJson),
+    });
 
     rows.push({
       id: p.id,
@@ -70,6 +73,9 @@ export default async function RepositoryPage({
       createdAt: p.createdAt,
       mediaType: p.mediaType,
       mediaUrl: p.mediaUrl,
+      mediaTitle: p.mediaTitle ?? null,
+      linkedinPostUrl: p.linkedinPostUrl ?? null,
+      topics: p.topics,
       impressions,
       engRate,
       engagements,

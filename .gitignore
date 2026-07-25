@@ -33,9 +33,14 @@ yarn-error.log*
 .env*
 !.env.example
 
-# local db
+# local db / uploads / analytics imports
 /data/*.db
 /data/*.db-*
+/data/uploads/
+/data/imports/
+
+# LinkedIn Playwright session (secrets)
+linkedin-session.json
 
 # vercel
 .vercel

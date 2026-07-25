@@ -2,14 +2,21 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC = ["/login", "/api/login", "/api/health", "/api/cron", "/api/worker"];
+const PUBLIC = [
+  "/login",
+  "/api/login",
+  "/api/health",
+  "/api/cron",
+  "/api/worker",
+  "/api/media/file",
+];
 
 function secret() {
   const s = process.env.APP_PASSWORD ?? "linkedwin-dev";
   return new TextEncoder().encode(s.padEnd(32, "0").slice(0, 32));
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (
     PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||

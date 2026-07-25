@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Expand, Eye, Hash, TrendingUp, Users } from "lucide-react";
+import { Expand, Eye, TrendingUp, Users } from "lucide-react";
 import { PeriodChips } from "@/components/PeriodChips";
 import {
   PostPreviewModal,
@@ -10,9 +10,14 @@ import {
 } from "@/components/PostPreviewModal";
 import { TrendsChartCard } from "@/components/TrendsChartCard";
 import { TrendsReferenceExport } from "@/components/TrendsReferenceExport";
-import { formatCompactNumber } from "@/lib/calendar-format";
-import type { getTrendsDashboard, TrendsPostSummary } from "@/lib/trends";
-import { formatFollowersDelta } from "@/lib/trends";
+import { formatCompactNumber, formatHashtagLabel, postHasHashtag } from "@/lib/calendar-format";
+import type { TrendsDashboard, TrendsPostSummary } from "@/lib/trends-shared";
+import { formatFollowersDelta } from "@/lib/trends-shared";
+import {
+  HashtagPostsModal,
+  type HashtagPostSummary,
+} from "@/components/HashtagPostsModal";
+import { HashtagTag } from "@/components/HashtagTag";
 import {
   DAILY_IMPRESSIONS_PERIODS,
   ENGAGEMENT_PERIODS,
@@ -24,11 +29,12 @@ import {
   type TrendsPeriodId,
 } from "@/lib/trends-periods";
 
-type Dashboard = Awaited<ReturnType<typeof getTrendsDashboard>>;
+type Dashboard = TrendsDashboard;
 
 type LeadersTab =
   | "impressions"
   | "engagement"
+  | "likes"
   | "comments"
   | "saves"
   | "sends"
@@ -37,6 +43,7 @@ type LeadersTab =
 const TABS: { id: LeadersTab; label: string }[] = [
   { id: "impressions", label: "Impressions" },
   { id: "engagement", label: "Engagement" },
+  { id: "likes", label: "Likes" },
   { id: "comments", label: "Comments" },
   { id: "saves", label: "Saves" },
   { id: "sends", label: "Sends" },
@@ -55,11 +62,13 @@ function toPreview(
     mediaTitle: post.mediaTitle,
     firstComment: post.firstComment,
     secondComment: post.secondComment,
+    thirdComment: post.thirdComment,
     topics: post.topics,
     stats: {
       impressions: post.impressions,
       engagementRate: post.engagementRate,
       engagements: post.engagements,
+      likes: post.likes,
       comments: post.comments,
       saves: post.saves,
       sends: post.sends,
@@ -74,6 +83,8 @@ function metricForTab(tab: LeadersTab, post: TrendsPostSummary): string {
       return formatCompactNumber(post.impressions);
     case "engagement":
       return `${post.engagementRate.toFixed(1)}% · ${formatCompactNumber(post.engagements)}`;
+    case "likes":
+      return formatCompactNumber(post.likes);
     case "comments":
       return formatCompactNumber(post.comments);
     case "saves":
@@ -98,12 +109,35 @@ export function TrendsView({ data }: { data: Dashboard }) {
   const [preview, setPreview] = useState<
     (PostPreviewData & { stats: PostPreviewStats }) | null
   >(null);
+  const [activeHashtag, setActiveHashtag] = useState<string | null>(null);
 
   const leaders = data.leaders[leadersPeriod as keyof typeof data.leaders];
   const postRows = useMemo(() => {
     if (!leaders || tab === "hashtags") return [];
     return leaders[tab];
   }, [leaders, tab]);
+
+  const matchingHashtagPosts = useMemo((): HashtagPostSummary[] => {
+    if (!activeHashtag) return [];
+    return data.referencePosts
+      .filter((p) =>
+        postHasHashtag(p.content, p.topics ?? "[]", activeHashtag),
+      )
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        content: p.content,
+        status: "published",
+        topics: p.topics ?? "[]",
+        scheduledFor: null,
+        publishedAt: p.publishedAt,
+        impressions: p.impressions,
+      }));
+  }, [activeHashtag, data.referencePosts]);
+
+  function openHashtag(tag: string) {
+    setActiveHashtag(formatHashtagLabel(tag));
+  }
 
   const deltaLabel = formatFollowersDelta(data.widgets.followersDeltaWeek);
   const top = data.widgets.topPostOfWeek;
@@ -131,13 +165,13 @@ export function TrendsView({ data }: { data: Dashboard }) {
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
             <Eye className="size-3.5" strokeWidth={1.2} aria-hidden />
-            Avg impressions / week
+            Average impressions
           </div>
           <div className="mt-1 text-[28px] font-bold">
             {formatCompactNumber(data.widgets.avgImpressionsPerWeek)}
           </div>
           <div className="mt-1 text-xs text-[var(--muted)]">
-            Trailing month average
+            Per week · trailing-month average
           </div>
         </div>
 
@@ -180,7 +214,8 @@ export function TrendsView({ data }: { data: Dashboard }) {
       />
 
       <TrendsChartCard
-        title="Average weekly impressions"
+        title="Average impressions"
+        subtitle="Totals per week for the selected period"
         periods={periodsFor(WEEKLY_IMPRESSIONS_PERIODS)}
         period={weeklyImprPeriod}
         onPeriodChange={setWeeklyImprPeriod}
@@ -263,12 +298,10 @@ export function TrendsView({ data }: { data: Dashboard }) {
                 <span className="w-6 shrink-0 text-xs font-semibold text-[var(--muted)]">
                   {i + 1}
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)]">
-                  <Hash className="size-3" strokeWidth={1.5} aria-hidden />
-                  {row.tag.replace(/^#/, "")}
-                </span>
+                <HashtagTag tag={row.tag} onClick={openHashtag} />
                 <span className="ml-auto shrink-0 text-xs text-[var(--muted)]">
-                  {formatCompactNumber(row.impressions)} impr · {row.posts} posts
+                  {formatCompactNumber(row.avgImpressions)} avg impr ·{" "}
+                  {row.posts} posts
                 </span>
               </li>
             ))}
@@ -315,6 +348,17 @@ export function TrendsView({ data }: { data: Dashboard }) {
           post={preview}
           stats={preview.stats}
           onClose={() => setPreview(null)}
+          onHashtagClick={(tag) => {
+            setPreview(null);
+            openHashtag(tag);
+          }}
+        />
+      ) : null}
+      {activeHashtag ? (
+        <HashtagPostsModal
+          tag={activeHashtag}
+          posts={matchingHashtagPosts}
+          onClose={() => setActiveHashtag(null)}
         />
       ) : null}
     </div>
