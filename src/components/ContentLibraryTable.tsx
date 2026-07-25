@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HashtagTag } from "@/components/HashtagTag";
 import {
   formatCompactNumber,
   formatLibraryDateTime,
@@ -87,9 +88,7 @@ export function ContentLibraryView({
           <>
             {" "}
             · Showing post from{" "}
-            <span className="font-medium text-[var(--accent)]">
-              {highlightTag}
-            </span>
+            <HashtagTag tag={highlightTag} emphasized />
           </>
         ) : null}
       </p>

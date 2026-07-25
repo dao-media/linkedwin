@@ -247,6 +247,7 @@ function PostTable({
                         <HashtagTag
                           key={tag.toLowerCase()}
                           tag={tag}
+                          emphasized={selected || editing}
                           onClick={openHashtag}
                         />
                       ))}
