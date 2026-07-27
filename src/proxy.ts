@@ -12,8 +12,18 @@ const PUBLIC = [
 ];
 
 function secret() {
-  const s = process.env.APP_PASSWORD ?? "linkedwin-dev";
-  return new TextEncoder().encode(s.padEnd(32, "0").slice(0, 32));
+  const configured = process.env.APP_PASSWORD?.trim();
+  if (!configured) {
+    if (
+      process.env.NODE_ENV === "production" ||
+      process.env.VERCEL === "1" ||
+      Boolean(process.env.FLY_APP_NAME)
+    ) {
+      throw new Error("APP_PASSWORD must be set in production");
+    }
+    return new TextEncoder().encode("linkedwin".padEnd(32, "0").slice(0, 32));
+  }
+  return new TextEncoder().encode(configured.padEnd(32, "0").slice(0, 32));
 }
 
 export async function proxy(req: NextRequest) {

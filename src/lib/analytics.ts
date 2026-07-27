@@ -1,6 +1,10 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import {
+  extractHashtags,
+  normalizeHashtagKey,
+} from "./calendar-format";
 import { db, ensureSchema } from "./db";
-import { metricsSnapshots, posts } from "./schema";
+import { dailyMetrics, metricsSnapshots, posts } from "./schema";
 import type { DateRangeId } from "./voice";
 import { DATE_RANGES } from "./voice";
 
@@ -12,6 +16,10 @@ function rangeStart(rangeId: DateRangeId) {
   return d.toISOString();
 }
 
+function dayKey(iso: string) {
+  return iso.slice(0, 10);
+}
+
 export function parseTopics(raw: string | null | undefined): string[] {
   try {
     const v = JSON.parse(raw ?? "[]");
@@ -19,6 +27,42 @@ export function parseTopics(raw: string | null | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+async function buildImpressionTrend(
+  rangeId: DateRangeId,
+  published: (typeof posts.$inferSelect)[],
+  latestByPost: Map<string, { impressions: number | null }>,
+): Promise<{ date: string; impressions: number }[]> {
+  const start = rangeStart(rangeId);
+  const startDay = start ? dayKey(start) : null;
+
+  const accountDays = await db
+    .select()
+    .from(dailyMetrics)
+    .orderBy(asc(dailyMetrics.date))
+    .all();
+
+  const fromAccount = accountDays
+    .filter((d) => !startDay || d.date >= startDay)
+    .map((d) => ({ date: d.date, impressions: d.impressions ?? 0 }));
+
+  if (fromAccount.some((d) => d.impressions > 0)) {
+    return fromAccount;
+  }
+
+  const buckets = new Map<string, number>();
+  for (const p of published) {
+    if (!p.publishedAt) continue;
+    const day = dayKey(p.publishedAt);
+    if (startDay && day < startDay) continue;
+    const impr = latestByPost.get(p.id)?.impressions ?? 0;
+    buckets.set(day, (buckets.get(day) ?? 0) + impr);
+  }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, impressions]) => ({ date, impressions }));
 }
 
 export async function getOverviewStats(rangeId: DateRangeId = "30d") {
@@ -68,22 +112,31 @@ export async function getOverviewStats(rangeId: DateRangeId = "30d") {
   const engagementRate =
     impressions > 0 ? (engagements / impressions) * 100 : 0;
 
-  const topicMap = new Map<string, { impressions: number; posts: number }>();
+  const hashtagMap = new Map<
+    string,
+    { tag: string; impressions: number; posts: number }
+  >();
   for (const p of published) {
     const snap = latestByPost.get(p.id);
     const impr = snap?.impressions ?? 0;
-    for (const t of parseTopics(p.topics)) {
-      const cur = topicMap.get(t) ?? { impressions: 0, posts: 0 };
+    for (const tag of extractHashtags(p.content, p.topics)) {
+      const key = normalizeHashtagKey(tag);
+      if (!key) continue;
+      const cur = hashtagMap.get(key) ?? { tag, impressions: 0, posts: 0 };
       cur.impressions += impr;
       cur.posts += 1;
-      topicMap.set(t, cur);
+      hashtagMap.set(key, cur);
     }
   }
 
-  const topTopics = [...topicMap.entries()]
-    .map(([name, v]) => ({ name, ...v }))
-    .sort((a, b) => b.impressions - a.impressions)
-    .slice(0, 5);
+  const topHashtags = [...hashtagMap.values()]
+    .map((row) => ({
+      tag: row.tag,
+      posts: row.posts,
+      avgImpressions: row.posts > 0 ? row.impressions / row.posts : 0,
+    }))
+    .sort((a, b) => b.avgImpressions - a.avgImpressions)
+    .slice(0, 25);
 
   const recent = published
     .slice()
@@ -108,13 +161,20 @@ export async function getOverviewStats(rangeId: DateRangeId = "30d") {
     .where(eq(posts.status, "scheduled"))
     .get();
 
+  const impressionTrend = await buildImpressionTrend(
+    rangeId,
+    published,
+    latestByPost,
+  );
+
   return {
     impressions,
     engagementRate,
     postsPublished: published.length,
     scheduledCount: Number(scheduledCount?.c ?? 0),
-    topTopics,
+    topHashtags,
     recent,
+    impressionTrend,
   };
 }
 

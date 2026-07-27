@@ -38,6 +38,7 @@ export function FooterEditModal({
 
   return (
     <div
+      data-calendar-interactive
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
       role="dialog"
       aria-modal="true"
@@ -53,7 +54,7 @@ export function FooterEditModal({
         <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
           <h2
             id="footer-edit-modal-title"
-            className="text-base font-semibold text-[var(--ink)]"
+            className="type-h3 text-[var(--ink)]"
           >
             {mode === "create" ? "Save footer" : "Edit footer"}
           </h2>
@@ -69,11 +70,11 @@ export function FooterEditModal({
         </div>
 
         <div className="space-y-3 px-5 py-4">
-          <label className="block text-sm font-medium text-[var(--ink)]">
+          <label className="type-label-l block text-[var(--ink)]">
             Name
             <input
               type="text"
-              className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="type-p-m mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 outline-none focus:border-[var(--accent)]"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={saving}
@@ -82,10 +83,10 @@ export function FooterEditModal({
             />
           </label>
 
-          <label className="block text-sm font-medium text-[var(--ink)]">
+          <label className="type-label-l block text-[var(--ink)]">
             Footer
             <textarea
-              className="mt-1.5 min-h-[88px] w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="type-p-m mt-1.5 min-h-[88px] w-full resize-y rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 outline-none focus:border-[var(--accent)]"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={saving}
@@ -98,13 +99,13 @@ export function FooterEditModal({
             onInsert={(chars) => setBody((current) => `${current}${chars}`)}
           />
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="type-p-m text-red-600">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--line)] px-5 py-3">
           <button
             type="button"
-            className="rounded-lg px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--bg)]"
+            className="type-p-m rounded-lg px-3 py-1.5 text-[var(--muted)] hover:bg-[var(--bg)]"
             onClick={onClose}
             disabled={saving}
           >
@@ -112,7 +113,7 @@ export function FooterEditModal({
           </button>
           <button
             type="button"
-            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+            className="type-btn-m rounded-lg bg-[var(--accent)] px-3 py-1.5 text-white disabled:opacity-50"
             disabled={saving || !canSave}
             onClick={() =>
               onSave({ name: name.trim(), body: body.trim() })

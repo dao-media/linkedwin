@@ -8,6 +8,8 @@ primary_region = "iad"
 [env]
   PLAYWRIGHT_ENABLED = "true"
   PLAYWRIGHT_HEADLESS = "true"
+  # Also set via `fly secrets`: LIBSQL_URL, LIBSQL_AUTH_TOKEN (same as Vercel),
+  # CRON_SECRET/WORKER_SECRET, Zernio keys if worker reads settings from DB only.
 
 [[vm]]
   memory = "512mb"

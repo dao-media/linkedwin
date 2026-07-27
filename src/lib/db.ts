@@ -1,18 +1,44 @@
-import { createClient } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
 
-const dataDir = path.join(process.cwd(), "data");
-const dbPath = process.env.SQLITE_PATH ?? path.join(dataDir, "linkedwin.db");
+function resolveLibsqlConfig(): { url: string; authToken?: string } {
+  const url =
+    process.env.LIBSQL_URL?.trim() ||
+    process.env.TURSO_DATABASE_URL?.trim() ||
+    "";
+  const authToken =
+    process.env.LIBSQL_AUTH_TOKEN?.trim() ||
+    process.env.TURSO_AUTH_TOKEN?.trim() ||
+    undefined;
 
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+  if (url) {
+    return { url, authToken };
+  }
+
+  const onSharedHost =
+    process.env.VERCEL === "1" || Boolean(process.env.FLY_APP_NAME);
+  if (onSharedHost && process.env.ALLOW_LOCAL_SQLITE !== "true") {
+    throw new Error(
+      "Remote libSQL is required on Vercel/Fly so the web app and worker share data. Set LIBSQL_URL (or TURSO_DATABASE_URL) and LIBSQL_AUTH_TOKEN (or TURSO_AUTH_TOKEN).",
+    );
+  }
+
+  const dataDir = path.join(process.cwd(), "data");
+  const dbPath = process.env.SQLITE_PATH ?? path.join(dataDir, "linkedwin.db");
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  return { url: `file:${dbPath}` };
 }
 
-const client = createClient({
-  url: `file:${dbPath}`,
+const libsql = resolveLibsqlConfig();
+
+const client: Client = createClient({
+  url: libsql.url,
+  authToken: libsql.authToken,
 });
 
 export const db = drizzle(client, { schema });

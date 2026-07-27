@@ -9,14 +9,14 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { DateRangeSelect } from "@/components/DateRangeSelect";
+import { HashtagTag } from "@/components/HashtagTag";
 import { getOverviewStats } from "@/lib/analytics";
+import {
+  formatCalendarDateChip,
+  formatCompactNumber,
+} from "@/lib/calendar-format";
 import type { DateRangeId } from "@/lib/voice";
 import { DATE_RANGES } from "@/lib/voice";
-
-function formatNum(n: number) {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return String(Math.round(n));
-}
 
 export default async function OverviewPage({
   searchParams,
@@ -31,7 +31,7 @@ export default async function OverviewPage({
   const cards = [
     {
       label: "Impressions",
-      value: formatNum(stats.impressions),
+      value: formatCompactNumber(stats.impressions),
       icon: Eye,
     },
     {
@@ -41,12 +41,12 @@ export default async function OverviewPage({
     },
     {
       label: "Posts published",
-      value: String(stats.postsPublished),
+      value: formatCompactNumber(stats.postsPublished),
       icon: ListChecks,
     },
     {
       label: "Queued",
-      value: String(stats.scheduledCount),
+      value: formatCompactNumber(stats.scheduledCount),
       icon: CalendarClock,
     },
   ] as const;
@@ -67,18 +67,18 @@ export default async function OverviewPage({
             key={label}
             className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5"
           >
-            <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+            <div className="flex items-center gap-2 type-p-s text-[var(--muted)]">
               <Icon className="size-3.5" strokeWidth={1.2} aria-hidden />
               {label}
             </div>
-            <div className="mt-1 text-[28px] font-bold">{value}</div>
+            <div className="mt-1 type-stat">{value}</div>
           </div>
         ))}
       </div>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5 lg:col-span-2">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <h2 className="mb-3 flex items-center gap-2 type-h5">
             <LineChart
               className="size-4 text-[var(--accent)]"
               strokeWidth={1.2}
@@ -86,40 +86,68 @@ export default async function OverviewPage({
             />
             Impressions trend
           </h2>
-          <div className="flex h-44 items-end gap-2 rounded-lg bg-[var(--accent-soft)] p-4">
-            {[40, 55, 35, 70, 60, 85, 75, 90, 65, 80].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 rounded-t bg-[var(--accent)]/70"
-                style={{ height: `${h}%` }}
-              />
-            ))}
-          </div>
+          {stats.impressionTrend.length === 0 ? (
+            <p className="flex h-44 items-center justify-center rounded-lg bg-[var(--accent-soft)] type-p-m text-[var(--muted)]">
+              No impression data yet
+            </p>
+          ) : (
+            <div className="flex h-44 items-end gap-1 rounded-lg bg-[var(--accent-soft)] p-4 sm:gap-2">
+              {(() => {
+                const max = Math.max(
+                  ...stats.impressionTrend.map((d) => d.impressions),
+                  1,
+                );
+                return stats.impressionTrend.map((d) => {
+                  const pct = Math.max(4, (d.impressions / max) * 100);
+                  return (
+                    <div
+                      key={d.date}
+                      className="min-w-0 flex-1 rounded-t bg-[var(--accent)]/70"
+                      style={{ height: `${pct}%` }}
+                      title={`${d.date}: ${formatCompactNumber(d.impressions)}`}
+                    />
+                  );
+                });
+              })()}
+            </div>
+          )}
         </div>
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <h2 className="mb-3 flex items-center gap-2 type-h5">
             <Tags
               className="size-4 text-[var(--accent)]"
               strokeWidth={1.2}
               aria-hidden
             />
-            Top topics
+            Top hashtags
           </h2>
-          <ul className="space-y-2 text-sm">
-            {stats.topTopics.length === 0 && (
-              <li className="text-[var(--muted)]">No topic data yet</li>
+          <ul className="max-h-44 divide-y divide-[var(--line)] overflow-y-auto">
+            {stats.topHashtags.length === 0 && (
+              <li className="py-2 type-p-m text-[var(--muted)]">
+                No hashtag data yet
+              </li>
             )}
-            {stats.topTopics.map((t) => (
-              <li key={t.name}>
-                {t.name} — {formatNum(t.impressions)} · {t.posts} posts
+            {stats.topHashtags.map((row, i) => (
+              <li
+                key={row.tag}
+                className="flex items-center gap-3 py-2.5 type-p-m"
+              >
+                <span className="w-6 shrink-0 type-label-m text-[var(--muted)]">
+                  {i + 1}
+                </span>
+                <HashtagTag tag={row.tag} />
+                <span className="ml-auto shrink-0 type-p-s text-[var(--muted)]">
+                  {formatCompactNumber(row.avgImpressions)} avg impr ·{" "}
+                  {row.posts} posts
+                </span>
               </li>
             ))}
           </ul>
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 type-h5">
           <ListChecks
             className="size-4 text-[var(--accent)]"
             strokeWidth={1.2}
@@ -127,21 +155,73 @@ export default async function OverviewPage({
           />
           Recent posts
         </h2>
-        <div className="space-y-2 text-sm text-[var(--muted)]">
-          {stats.recent.length === 0 && <p>No published posts in this range.</p>}
-          {stats.recent.map((p) => (
-            <div
-              key={p.id}
-              className="flex justify-between gap-4 border-b border-[var(--line)] py-2 last:border-0"
-            >
-              <span className="truncate text-[var(--ink)]">{p.title}</span>
-              <span className="shrink-0">
-                {formatNum(p.impressions)} · {p.engagement} eng
-              </span>
-            </div>
-          ))}
+        <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+          <table className="w-full table-fixed text-left type-p-m">
+            <colgroup>
+              <col />
+              <col className="w-[8.5rem]" />
+              <col className="w-[8.5rem]" />
+            </colgroup>
+            <thead className="bg-[var(--bg)] text-[var(--muted)]">
+              <tr>
+                <th className="px-4 py-3 text-left type-h5 text-[var(--muted)]">Post</th>
+                <th className="px-4 py-3 text-left type-h5 text-[var(--muted)]">
+                  Impressions
+                </th>
+                <th className="px-4 py-3 text-left type-h5 text-[var(--muted)]">
+                  Engagement
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.recent.map((p) => {
+                const published = p.publishedAt
+                  ? new Date(p.publishedAt)
+                  : null;
+                const chip =
+                  published && !Number.isNaN(published.getTime())
+                    ? formatCalendarDateChip(published)
+                    : null;
+                return (
+                  <tr key={p.id} className="border-t border-[var(--line)]">
+                    <td className="px-4 py-3 align-middle text-left">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {chip && (
+                          <span className="type-chip inline-flex h-6 shrink-0 items-center rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 text-[var(--muted)]">
+                            {chip}
+                          </span>
+                        )}
+                        <span
+                          className="type-label-l min-w-0 truncate leading-none text-[var(--ink)]"
+                          title={p.title}
+                        >
+                          {p.title}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-middle text-left text-[var(--muted)]">
+                      {formatCompactNumber(p.impressions)}
+                    </td>
+                    <td className="px-4 py-3 align-middle text-left text-[var(--muted)]">
+                      {p.engagement}
+                    </td>
+                  </tr>
+                );
+              })}
+              {stats.recent.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="px-4 py-10 text-center text-[var(--muted)]"
+                  >
+                    No published posts in this range.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </section>
     </AppShell>
   );
 }

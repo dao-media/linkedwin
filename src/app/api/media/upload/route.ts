@@ -12,6 +12,16 @@ import {
 
 export async function POST(request: Request) {
   try {
+    if (!hasBlobToken() && process.env.VERCEL === "1") {
+      return NextResponse.json(
+        {
+          error:
+            "BLOB_READ_WRITE_TOKEN is required on Vercel. Local filesystem uploads do not persist across serverless instances.",
+        },
+        { status: 503 },
+      );
+    }
+
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {

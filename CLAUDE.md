@@ -5,7 +5,8 @@ Personal LinkedIn Content HQ.
 ## Stack
 
 - **Next.js** (App Router) on Vercel
-- **SQLite** (`data/linkedwin.db`) via `@libsql/client` — zero-cost personal DB (Neon-ready later)
+- **libSQL / SQLite** via `@libsql/client` — local `data/linkedwin.db` in dev; **Turso (remote libSQL)** on Vercel + Fly so both share posts/jobs/session
+- **Vercel Blob** for Composer media on Vercel (`BLOB_READ_WRITE_TOKEN`)
 - **Zernio** for schedule / documents / `firstComment` / analytics
 - **Fly worker + Playwright** for 12h native self-repost (and optional second comments)
 
@@ -35,8 +36,10 @@ Login at http://localhost:3000/login with `APP_PASSWORD` (default in example: `l
 
 See `.env.example`. Critical:
 
-- `APP_PASSWORD` — gate for the personal dashboard
-- `ZERNIO_API_KEY` + `ZERNIO_LINKEDIN_ACCOUNT_ID` — publishing
+- `APP_PASSWORD` — gate for the personal dashboard (**required** in production)
+- `LIBSQL_URL` + `LIBSQL_AUTH_TOKEN` (or `TURSO_*`) — shared DB for Vercel + Fly
+- `BLOB_READ_WRITE_TOKEN` — durable media URLs on Vercel
+- `ZERNIO_API_KEY` + `ZERNIO_LINKEDIN_ACCOUNT_ID` — publishing (schedule fails hard when configured)
 - `CRON_SECRET` — protects `/api/cron/*` and `/api/worker/run`
 - `PLAYWRIGHT_ENABLED=true` on the Fly worker only
 
@@ -70,4 +73,4 @@ Avoid `Continue with Google` in Playwright — Google blocks OAuth in automated 
 - Zernio LinkedIn: put links in `firstComment`, not the caption
 - Document posts need `documentTitle` / media title
 - Native repost is ToS-gray — keep to 1/day
-- SQLite file must be writable; on Vercel use a remote DB or volume — for personal use prefer a small always-on host or migrate to Neon
+- Local SQLite is fine for `npm run dev`; production must use remote libSQL + Blob so Vercel and Fly see the same data

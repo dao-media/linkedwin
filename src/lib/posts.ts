@@ -6,12 +6,33 @@ import {
   normalizePinnedComments,
 } from "./calendar-format";
 import { db, ensureSchema } from "./db";
-import { automationJobs, posts } from "./schema";
+import { automationJobs, metricsSnapshots, posts } from "./schema";
+import { getZernioConfig } from "./settings";
 import {
+  deleteZernioPost,
   scheduleLinkedInPost,
   updateZernioPost,
   updateZernioSchedule,
 } from "./zernio";
+
+/**
+ * When Zernio credentials exist, schedule/update must succeed unless
+ * ZERNIO_REQUIRED=false (local-only demos). Explicit true always requires sync.
+ */
+async function mustSyncZernio(): Promise<boolean> {
+  if (process.env.ZERNIO_REQUIRED === "true") return true;
+  if (process.env.ZERNIO_REQUIRED === "false") return false;
+  const { apiKey, accountId } = await getZernioConfig();
+  return Boolean(apiKey && accountId);
+}
+
+function extractZernioPostId(res: unknown): string | null {
+  if (!res || typeof res !== "object") return null;
+  const r = res as Record<string, unknown>;
+  const post = r.post as Record<string, unknown> | undefined;
+  const id = post?._id ?? post?.id ?? r._id ?? r.id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
 
 export type CreatePostInput = {
   title?: string;
@@ -113,6 +134,7 @@ export async function createScheduledPost(input: CreatePostInput) {
   const repostAfterHours = input.repostAfterHours ?? 12;
 
   if (!asDraft && input.publishToZernio !== false && scheduledFor) {
+    const requireZernio = await mustSyncZernio();
     try {
       const res = await scheduleLinkedInPost({
         content,
@@ -124,10 +146,12 @@ export async function createScheduledPost(input: CreatePostInput) {
         mediaTitle: input.mediaTitle,
         tags: topicList,
       });
-      zernioPostId =
-        res?.post?._id ?? res?.post?.id ?? res?._id ?? res?.id ?? null;
+      zernioPostId = extractZernioPostId(res);
+      if (!zernioPostId) {
+        throw new Error("Zernio schedule succeeded but returned no post id");
+      }
     } catch (err) {
-      if (process.env.ZERNIO_REQUIRED === "true") throw err;
+      if (requireZernio) throw err;
       console.warn("Zernio schedule skipped:", err);
     }
   }
@@ -178,10 +202,12 @@ export async function reschedulePost(
   let zernioPostId = post.zernioPostId;
   const tz = timezone ?? post.timezone;
 
+  const requireZernio = await mustSyncZernio();
   if (zernioPostId) {
     try {
       await updateZernioSchedule(zernioPostId, scheduledFor, tz);
     } catch (err) {
+      if (requireZernio) throw err;
       console.warn("Zernio reschedule failed:", err);
     }
   } else if (wasDraft) {
@@ -202,10 +228,12 @@ export async function reschedulePost(
         mediaTitle: post.mediaTitle,
         tags: topics,
       });
-      zernioPostId =
-        res?.post?._id ?? res?.post?.id ?? res?._id ?? res?.id ?? null;
+      zernioPostId = extractZernioPostId(res);
+      if (!zernioPostId) {
+        throw new Error("Zernio schedule succeeded but returned no post id");
+      }
     } catch (err) {
-      if (process.env.ZERNIO_REQUIRED === "true") throw err;
+      if (requireZernio) throw err;
       console.warn("Zernio schedule on draft promote skipped:", err);
     }
   }
@@ -411,7 +439,7 @@ export async function updateScheduledPost(postId: string, input: UpdatePostInput
         mediaTitle: mediaTitle ?? null,
       });
     } catch (err) {
-      if (process.env.ZERNIO_REQUIRED === "true") throw err;
+      if (await mustSyncZernio()) throw err;
       console.warn("Zernio content update skipped:", err);
     }
   }
@@ -440,4 +468,91 @@ export async function updateScheduledPost(postId: string, input: UpdatePostInput
   );
 
   return db.select().from(posts).where(eq(posts.id, postId)).get();
+}
+
+async function cancelPendingJobs(postId: string, reason: string) {
+  const jobs = await db
+    .select()
+    .from(automationJobs)
+    .where(
+      and(eq(automationJobs.postId, postId), eq(automationJobs.status, "pending")),
+    )
+    .all();
+  for (const job of jobs) {
+    await db
+      .update(automationJobs)
+      .set({
+        status: "failed",
+        lastError: reason,
+        completedAt: new Date().toISOString(),
+      })
+      .where(eq(automationJobs.id, job.id));
+  }
+}
+
+/** Unschedule a post locally (and on Zernio when connected). */
+export async function movePostToDraft(postId: string) {
+  await ensureSchema();
+  const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
+  if (!post) throw new Error("Post not found");
+
+  const status = post.status.toLowerCase();
+  if (status === "draft") return post;
+  if (status === "published") {
+    throw new Error("Published posts cannot be moved to drafts");
+  }
+
+  if (post.zernioPostId) {
+    try {
+      await deleteZernioPost(post.zernioPostId);
+    } catch (err) {
+      // Scheduled posts must leave Zernio or they will still publish.
+      throw err instanceof Error
+        ? err
+        : new Error("Could not cancel Zernio schedule");
+    }
+  }
+
+  await cancelPendingJobs(postId, "Moved to draft");
+
+  await db
+    .update(posts)
+    .set({
+      status: "draft",
+      zernioPostId: null,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(posts.id, postId));
+
+  return db.select().from(posts).where(eq(posts.id, postId)).get();
+}
+
+/** Permanently remove a post from LinkedWin (and Zernio when connected). */
+export async function deletePost(postId: string) {
+  await ensureSchema();
+  const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
+  if (!post) throw new Error("Post not found");
+
+  if (post.zernioPostId) {
+    const status = post.status.toLowerCase();
+    try {
+      await deleteZernioPost(post.zernioPostId);
+    } catch (err) {
+      // Published posts often cannot be deleted via Zernio — local remove still proceeds.
+      // Draft/scheduled must cancel remotely or LinkedIn will still get the post.
+      if (status === "scheduled" || status === "draft") {
+        throw err instanceof Error
+          ? err
+          : new Error("Could not delete Zernio schedule");
+      }
+      console.warn("Zernio delete skipped (published):", err);
+    }
+  }
+
+  await db.delete(automationJobs).where(eq(automationJobs.postId, postId));
+  await db
+    .delete(metricsSnapshots)
+    .where(eq(metricsSnapshots.postId, postId));
+  await db.delete(posts).where(eq(posts.id, postId));
+  return { ok: true as const };
 }

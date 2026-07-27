@@ -44,6 +44,7 @@ export function ScheduleTimeModal({
 
   return (
     <div
+      data-calendar-interactive
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
       role="dialog"
       aria-modal="true"
@@ -60,12 +61,12 @@ export function ScheduleTimeModal({
           <div>
             <h2
               id="time-modal-title"
-              className="text-base font-semibold text-[var(--ink)]"
+              className="type-h3 text-[var(--ink)]"
             >
               Set time
             </h2>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">{dateLabel}</p>
-            <p className="mt-1 truncate text-xs text-[var(--ink)]">
+            <p className="type-p-m mt-0.5 text-[var(--muted)]">{dateLabel}</p>
+            <p className="type-p-s mt-1 truncate text-[var(--ink)]">
               {truncateCaption(postTitle, 48) || "Untitled post"}
             </p>
           </div>
@@ -81,24 +82,24 @@ export function ScheduleTimeModal({
         </div>
 
         <div className="space-y-3 px-5 py-4">
-          <label className="block text-sm font-medium text-[var(--ink)]">
+          <label className="type-label-l block text-[var(--ink)]">
             Time
             <input
               type="time"
-              className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="type-p-m mt-1.5 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 outline-none focus:border-[var(--accent)]"
               value={time}
               onChange={(e) => setTime(e.target.value)}
               disabled={saving}
               autoFocus
             />
           </label>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="type-p-m text-red-600">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--line)] px-5 py-3">
           <button
             type="button"
-            className="rounded-lg px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--bg)]"
+            className="type-p-m rounded-lg px-3 py-1.5 text-[var(--muted)] hover:bg-[var(--bg)]"
             onClick={onClose}
             disabled={saving}
           >
@@ -106,7 +107,7 @@ export function ScheduleTimeModal({
           </button>
           <button
             type="button"
-            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+            className="type-btn-m rounded-lg bg-[var(--accent)] px-3 py-1.5 text-white disabled:opacity-50"
             disabled={saving || !time}
             onClick={() => onSave(time)}
           >

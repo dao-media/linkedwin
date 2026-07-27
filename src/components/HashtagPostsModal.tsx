@@ -88,6 +88,7 @@ export function HashtagPostsModal({
 
   return (
     <div
+      data-calendar-interactive
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
       role="dialog"
       aria-modal="true"
@@ -102,11 +103,11 @@ export function HashtagPostsModal({
           <div>
             <h2
               id="hashtag-modal-title"
-              className="text-base font-semibold text-[var(--ink)]"
+              className="type-h3 text-[var(--ink)]"
             >
               Posts with {label}
             </h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
+            <p className="type-p-s mt-0.5 text-[var(--muted)]">
               {sorted.length} {sorted.length === 1 ? "post" : "posts"} · sorted
               by impressions
             </p>
@@ -123,7 +124,7 @@ export function HashtagPostsModal({
 
         <ul className="min-h-0 flex-1 overflow-y-auto py-1">
           {pagePosts.length === 0 && (
-            <li className="px-5 py-8 text-center text-sm text-[var(--muted)]">
+            <li className="type-p-m px-5 py-8 text-center text-[var(--muted)]">
               No posts use this hashtag.
             </li>
           )}
@@ -141,11 +142,11 @@ export function HashtagPostsModal({
                   router.push(`/repository?${params.toString()}`);
                 }}
               >
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]">
+                <span className="type-label-l min-w-0 flex-1 truncate text-[var(--ink)]">
                   {postLabel(post)}
                 </span>
-                <span className="shrink-0 text-right text-xs text-[var(--muted)]">
-                  <span className="font-semibold tabular-nums text-[var(--ink)]">
+                <span className="type-p-s shrink-0 text-right text-[var(--muted)]">
+                  <span className="type-label-s tabular-nums text-[var(--ink)]">
                     {formatCompactNumber(post.impressions)}
                   </span>
                   <span className="mx-1.5 text-[var(--line)]">·</span>
@@ -158,7 +159,7 @@ export function HashtagPostsModal({
 
         {sorted.length > PAGE_SIZE ? (
           <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-5 py-3">
-            <p className="text-xs text-[var(--muted)]">
+            <p className="type-p-s text-[var(--muted)]">
               {from}–{to} of {sorted.length}
             </p>
             <div className="flex items-center gap-1.5">
@@ -171,7 +172,7 @@ export function HashtagPostsModal({
               >
                 <ChevronLeft className="size-4" strokeWidth={1.2} />
               </button>
-              <span className="min-w-[4.5rem] text-center text-xs font-medium text-[var(--muted)]">
+              <span className="type-p-s min-w-[4.5rem] text-center text-[var(--muted)]">
                 {safePage + 1} / {totalPages}
               </span>
               <button

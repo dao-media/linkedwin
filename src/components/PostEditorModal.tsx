@@ -186,6 +186,7 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
   return (
     <>
       <div
+        data-calendar-interactive
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
         role="dialog"
         aria-modal="true"
@@ -200,11 +201,11 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
             <div className="min-w-0 flex-1">
               <h2
                 id="post-editor-title"
-                className="truncate text-[15px] font-semibold text-[var(--ink)]"
+                className="type-h4 truncate text-[var(--ink)]"
               >
                 Edit post
               </h2>
-              <p className="truncate text-xs text-[var(--muted)]">
+              <p className="type-p-s truncate text-[var(--muted)]">
                 Caption, mentions, footers, pinned comments
               </p>
             </div>
@@ -220,11 +221,11 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+              <span className="type-label-m mb-1 block text-[var(--muted)]">
                 Caption
               </span>
               <textarea
-                className="min-h-40 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] p-3 text-sm outline-none focus:border-[var(--accent)]"
+                className="type-p-m min-h-40 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] p-3 outline-none focus:border-[var(--accent)]"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 onBlur={() => setContent((c) => lowercaseHashtagsInText(c))}
@@ -236,7 +237,7 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
 
             <section className="space-y-2.5">
               <div className="flex items-center gap-2">
-                <h3 className="shrink-0 text-xs font-semibold text-[var(--muted)]">
+                <h3 className="type-label-m shrink-0 text-[var(--muted)]">
                   Saved footers
                 </h3>
                 <div className="h-px min-w-0 flex-1 bg-[var(--line)]" />
@@ -246,15 +247,15 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
                     setFooterError(null);
                     setFooterModal({ type: "create", seedBody: content.trim() });
                   }}
-                  className="shrink-0 rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)]"
+                  className="type-btn-s shrink-0 rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]"
                 >
                   + Save current
                 </button>
               </div>
               {!footersLoaded ? (
-                <p className="text-sm text-[var(--muted)]">Loading…</p>
+                <p className="type-p-m text-[var(--muted)]">Loading…</p>
               ) : footers.length === 0 ? (
-                <p className="text-sm text-[var(--muted)]">No saved footers yet.</p>
+                <p className="type-p-m text-[var(--muted)]">No saved footers yet.</p>
               ) : (
                 <ul className="space-y-2">
                   {footers.map((footer) => (
@@ -263,8 +264,8 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
                       className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-3 py-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{footer.name}</p>
-                        <p className="truncate text-xs text-[var(--muted)]">
+                        <p className="type-label-l truncate">{footer.name}</p>
+                        <p className="type-p-s truncate text-[var(--muted)]">
                           {footer.body}
                         </p>
                       </div>
@@ -287,7 +288,7 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
                       <button
                         type="button"
                         onClick={() => insertFooter(footer.body)}
-                        className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-semibold text-white"
+                        className="type-btn-s rounded-md bg-[var(--accent)] px-2.5 py-1 text-white"
                       >
                         Insert
                       </button>
@@ -315,19 +316,19 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
               }
             />
 
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+            <label className="type-p-m block">
+              <span className="type-label-m mb-1 block text-[var(--muted)]">
                 Topics (comma-separated)
               </span>
               <input
-                className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+                className="type-p-m w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
                 value={topics}
                 onChange={(e) => setTopics(e.target.value)}
               />
             </label>
 
             {error ? (
-              <p className="text-sm text-red-600" role="alert">
+              <p className="type-p-m text-red-600" role="alert">
                 {error}
               </p>
             ) : null}
@@ -337,7 +338,7 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm font-medium"
+              className="type-label-l rounded-lg border border-[var(--line)] px-3 py-1.5"
             >
               Cancel
             </button>
@@ -345,7 +346,7 @@ export function PostEditorModal({ post, onClose, onSaved }: PostEditorModalProps
               type="button"
               disabled={saving || !content.trim()}
               onClick={() => void onSave()}
-              className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="type-btn-m rounded-lg bg-[var(--accent)] px-3 py-1.5 text-white disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save changes"}
             </button>
