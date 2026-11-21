@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import { VOICE_INSERTS } from "@/lib/voice";
+import { useProfile } from "@/lib/use-profile";
 
 type VoiceInsertBarProps = {
   onInsert: (chars: string) => void;
@@ -10,26 +10,27 @@ type VoiceInsertBarProps = {
 };
 
 export function VoiceInsertBar({ onInsert, mini = false }: VoiceInsertBarProps) {
+  const { voice: VOICE_INSERTS } = useProfile();
   const groups = mini
-    ? ([["Sign-off", VOICE_INSERTS.signOff]] as const)
+    ? ([["Sign-off", VOICE_INSERTS.signOff]] as [string, string[]][])
     : ([
         ["Body", VOICE_INSERTS.body],
         ["Structure", VOICE_INSERTS.structure],
         ["Sign-off", VOICE_INSERTS.signOff],
-      ] as const);
+      ] as [string, string[]][]);
 
   return (
     <div className="rounded-lg bg-[var(--accent-soft)] p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)]">
+      <div className="type-label-m mb-2 flex items-center gap-1.5 text-[var(--accent)]">
         <Sparkles className="size-3.5" strokeWidth={1.2} aria-hidden />
-        Insert from dane-voice
+        Quick inserts
       </div>
       {groups.map(([label, chips]) => (
         <div
           key={label}
           className={`${mini ? "" : "mb-2 last:mb-0 "}flex flex-wrap items-center gap-2`}
         >
-          <span className="w-16 text-[11px] font-medium text-[var(--muted)]">
+          <span className="type-label-s w-16 text-[var(--muted)]">
             {label}
           </span>
           {chips.map((ch) => (
@@ -37,7 +38,7 @@ export function VoiceInsertBar({ onInsert, mini = false }: VoiceInsertBarProps) 
               key={`${label}-${ch}`}
               type="button"
               onClick={() => onInsert(ch)}
-              className="rounded-md border border-[var(--line)] bg-white px-2 py-1 text-sm hover:border-[var(--accent)]"
+              className="type-p-m rounded-md border border-[var(--line)] bg-white px-2 py-1 hover:border-[var(--accent)]"
             >
               {ch}
             </button>

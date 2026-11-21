@@ -41,9 +41,9 @@ export function TrendsChartCard({
     <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-[var(--ink)]">{title}</h2>
+          <h2 className="type-h5 text-[var(--ink)]">{title}</h2>
           {subtitle ? (
-            <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
+            <p className="type-p-s mt-0.5 text-[var(--muted)]">{subtitle}</p>
           ) : null}
         </div>
         <PeriodChips
@@ -55,7 +55,7 @@ export function TrendsChartCard({
       </div>
       <div className="h-52 rounded-lg bg-[var(--accent-soft)]/50 px-1 py-2">
         {series.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-[var(--muted)]">
+          <div className="type-p-m flex h-full items-center justify-center text-[var(--muted)]">
             No data for this period yet
           </div>
         ) : (

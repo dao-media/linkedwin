@@ -48,3 +48,9 @@ linkedin-session.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Personal one-off scripts, notes and voice (not part of the template)
+/local/
+
+# Personal Claude notes
+CLAUDE.local.md

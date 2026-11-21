@@ -1,13 +1,14 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import { truncateCodePoints } from "@/lib/calendar-format";
 import { db, ensureSchema } from "@/lib/db";
-import { syncAllRecentMetrics } from "@/lib/jobs";
-import { posts } from "@/lib/schema";
+import { metricsSnapshots, posts } from "@/lib/schema";
 import { getSetting, getZernioConfig, setSetting } from "@/lib/settings";
 import { recordFollowerSnapshot } from "@/lib/trends";
 import {
   getZernioAccount,
   listZernioAccounts,
+  getZernioPostAnalytics,
   listZernioPosts,
 } from "@/lib/zernio";
 
@@ -73,7 +74,7 @@ function extractPostFields(remote: Record<string, unknown>) {
   return {
     zernioPostId: id,
     content,
-    title: content.slice(0, 80) || "Untitled post",
+    title: truncateCodePoints(content, 80) || "Untitled post",
     status,
     scheduledFor,
     publishedAt,
@@ -248,4 +249,74 @@ export async function syncFromZernio(): Promise<SyncResult> {
 
 export async function getLastSyncAt() {
   return (await getSetting("last_zernio_sync_at")) ?? null;
+}
+
+// ── Optional Zernio per-post analytics (only for posts that have a Zernio id) ──
+
+export async function syncMetricsForPost(postId: string) {
+  const post = await db.select().from(posts).where(eq(posts.id, postId)).get();
+  // Historical imports use null or legacy favikon:* ids — Zernio only.
+  if (!post?.zernioPostId || post.zernioPostId.startsWith("favikon:")) return;
+  const analytics = await getZernioPostAnalytics(post.zernioPostId);
+  if (!analytics) return;
+
+  const impressions =
+    analytics.impressions ?? analytics.metrics?.impressions ?? 0;
+  const likes = analytics.likes ?? analytics.metrics?.likes ?? 0;
+  const comments = analytics.comments ?? analytics.metrics?.comments ?? 0;
+  const shares = analytics.shares ?? analytics.metrics?.shares ?? 0;
+  const clicks = analytics.clicks ?? analytics.metrics?.clicks ?? 0;
+  const saves = analytics.saves ?? analytics.metrics?.saves ?? 0;
+  const sends =
+    analytics.sends ??
+    analytics.metrics?.sends ??
+    analytics.metrics?.sendCount ??
+    0;
+  const reposts =
+    analytics.reposts ??
+    analytics.metrics?.reposts ??
+    analytics.metrics?.repostsCount ??
+    shares;
+  const engagementRate =
+    impressions > 0
+      ? ((likes + comments + shares + saves + sends) / impressions) * 100
+      : 0;
+
+  await db.insert(metricsSnapshots).values({
+    id: randomUUID(),
+    postId,
+    impressions,
+    likes,
+    comments,
+    shares,
+    clicks,
+    saves,
+    sends,
+    reposts,
+    engagementRate,
+    rawJson: JSON.stringify(analytics),
+  });
+}
+
+export async function syncAllRecentMetrics() {
+  await ensureSchema();
+  const recent = await db
+    .select()
+    .from(posts)
+    .where(eq(posts.status, "published"))
+    .orderBy(desc(posts.publishedAt))
+    .limit(80)
+    .all();
+
+  let synced = 0;
+  for (const p of recent) {
+    if (!p.zernioPostId || p.zernioPostId.startsWith("favikon:")) continue;
+    try {
+      await syncMetricsForPost(p.id);
+      synced += 1;
+    } catch (err) {
+      console.warn("metrics sync failed", p.id, err);
+    }
+  }
+  return { synced };
 }

@@ -1,0 +1,64 @@
+# Pulls your published LinkedIn posts, impressions/reactions/comments/reposts and
+# follower count into your LinkedWin database. Read-only on LinkedIn.
+#
+# Setup (once): Settings → Secrets and variables → Actions → add
+#   LIBSQL_URL         libsql://<db>.turso.io (same value as your Vercel env)
+#   LIBSQL_AUTH_TOKEN  Turso token
+# The LinkedIn session itself lives in your database (npm run session:capture).
+name: LinkedIn activity sync
+
+on:
+  schedule:
+    - cron: "17 */6 * * *" # every 6h, off the top of the hour
+  workflow_dispatch:
+    inputs:
+      scrolls:
+        description: "How far back to scroll (first run: 20–40)"
+        required: false
+        default: "15"
+
+concurrency:
+  group: linkedin-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LIBSQL_URL: ${{ secrets.LIBSQL_URL }}
+      LIBSQL_AUTH_TOKEN: ${{ secrets.LIBSQL_AUTH_TOKEN }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          if [ -z "$LIBSQL_URL" ]; then
+            echo "::notice::LIBSQL_URL secret not set — skipping. See README → Automatic sync."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.config.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Install Chromium
+        if: steps.config.outputs.ready == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Sync LinkedIn activity
+        if: steps.config.outputs.ready == 'true'
+        run: npm run activity:sync -- --scrolls "${{ github.event.inputs.scrolls || '15' }}"

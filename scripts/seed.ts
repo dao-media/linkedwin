@@ -1,8 +1,8 @@
+import "./_env";
 import { randomUUID } from "node:crypto";
 import { addHours } from "date-fns";
 import { db, ensureSchema } from "../src/lib/db";
 import {
-  automationJobs,
   engageRecs,
   ideas,
   metricsSnapshots,
@@ -33,7 +33,6 @@ async function main() {
       scheduledFor: publishedAt.toISOString(),
       topics: JSON.stringify(["AI agents", "Ops"]),
       firstComment: "Full stack notes: https://example.com/linkedwin",
-      repostEnabled: true,
       mediaType: "image",
       mediaUrl: "https://example.com/linkedwin-cover.png",
       followersAtPublish: 12480,
@@ -45,7 +44,6 @@ async function main() {
       status: "scheduled",
       scheduledFor: addHours(new Date(), 20).toISOString(),
       topics: JSON.stringify(["Engage"]),
-      repostEnabled: true,
     },
   ]);
 
@@ -61,14 +59,6 @@ async function main() {
     sends: 12,
     reposts: 54,
     engagementRate: 8.57,
-  });
-
-  await db.insert(automationJobs).values({
-    id: randomUUID(),
-    postId: scheduledId,
-    type: "repost",
-    runAt: addHours(addHours(new Date(), 20), 12).toISOString(),
-    status: "pending",
   });
 
   await db.insert(ideas).values([

@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { updateScheduledPost } from "@/lib/posts";
+import {
+  deletePost,
+  movePostToDraft,
+  updateScheduledPost,
+} from "@/lib/posts";
 
-const schema = z.object({
+const updateSchema = z.object({
   content: z.string().min(1),
   comments: z.array(z.string()).max(3).optional(),
   firstComment: z.string().optional(),
@@ -14,6 +18,10 @@ const schema = z.object({
   mediaTitle: z.string().nullable().optional(),
 });
 
+const moveToDraftSchema = z.object({
+  action: z.literal("moveToDraft"),
+});
+
 export async function PATCH(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -21,7 +29,14 @@ export async function PATCH(
   try {
     const { id } = await ctx.params;
     const json = await req.json();
-    const parsed = schema.parse({
+
+    if (json?.action === "moveToDraft") {
+      moveToDraftSchema.parse(json);
+      const post = await movePostToDraft(id);
+      return NextResponse.json({ post });
+    }
+
+    const parsed = updateSchema.parse({
       ...json,
       mediaUrl: json.mediaUrl || null,
     });
@@ -30,6 +45,20 @@ export async function PATCH(
       mediaUrl: parsed.mediaUrl || null,
     });
     return NextResponse.json({ post });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bad request";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await ctx.params;
+    await deletePost(id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bad request";
     return NextResponse.json({ error: message }, { status: 400 });

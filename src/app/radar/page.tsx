@@ -14,11 +14,11 @@ export default async function RadarPage() {
 
   return (
     <AppShell active="/radar" title="Radar">
-      <p className="mb-4 text-sm text-[var(--muted)]">
+      <p className="mb-4 type-p-m text-[var(--muted)]">
         Top posts in your niches — curated watch accounts and manual imports.
       </p>
       <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-        <ul className="space-y-3 text-sm">
+        <ul className="space-y-3 type-p-m">
           {items.length === 0 && (
             <li className="text-[var(--muted)]">
               No radar items yet. Run `npm run db:seed` or import niche posts.
@@ -29,7 +29,7 @@ export default async function RadarPage() {
               key={p.id}
               className="border-b border-[var(--line)] pb-3 last:border-0"
             >
-              <div className="font-medium">
+              <div className="type-label-l">
                 @{p.authorHandle} — {(p.engagementScore ?? 0).toLocaleString()} eng
               </div>
               <div className="text-[var(--muted)]">{p.title}</div>

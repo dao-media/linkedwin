@@ -1,26 +1,16 @@
 # LinkedWin
 
-Personal LinkedIn Content HQ.
+Self-hosted LinkedIn content HQ: plan, draft and analyze posts. **It never publishes,
+comments or reposts** — users post on LinkedIn themselves and activity sync reads it back.
+Designed as a template: anyone clones it, adds their own Turso DB + LinkedIn session, and runs it.
 
 ## Stack
 
 - **Next.js** (App Router) on Vercel
-- **libSQL / SQLite** via `@libsql/client` — local `data/linkedwin.db` in dev; **Turso (remote libSQL)** on Vercel + Fly so both share posts/jobs/session
-- **Vercel Blob** for Composer media on Vercel (`BLOB_READ_WRITE_TOKEN`)
-- **Zernio** for schedule / documents / `firstComment` / analytics
-- **Fly worker + Playwright** for 12h native self-repost (and optional second comments)
-
-## Quick start
-
-```bash
-npm install
-cp .env.example .env.local
-# set APP_PASSWORD
-npm run db:seed
-npm run dev
-```
-
-Login at http://localhost:3000/login with `APP_PASSWORD` (default in example: `linkedwin`).
+- **libSQL / SQLite** via `@libsql/client` + Drizzle — local `data/linkedwin.db` in dev; **Turso** in production so Vercel and the sync Action share data
+- **Vercel Blob** for Composer media (`BLOB_READ_WRITE_TOKEN`)
+- **Playwright** activity sync, scheduled by **GitHub Actions** (`.github/workflows/linkedin-sync.yml`)
+- **Zernio** — optional, read-only analytics add-on
 
 ## Commands
 
@@ -28,49 +18,34 @@ Login at http://localhost:3000/login with `APP_PASSWORD` (default in example: `l
 | --- | --- |
 | `npm run dev` | Local dashboard |
 | `npm run build` | Production build |
-| `npm run db:seed` | Demo posts, radar, engage recs |
-| `npm run worker` | Process due automation jobs |
-| `npm run worker:dry` | Process jobs without Playwright |
+| `npm run activity:sync -- --dry` | Scrape own LinkedIn activity → show changes (drop `--dry` to apply, `--scrolls N` to dig back) |
+| `npm run session:capture` | Headed login → saves Playwright storageState to the DB |
+| `npm run import:linkedin -- <xlsx>` | Import LinkedIn creator analytics export |
+| `npm run db:seed` | Demo data |
 
-## Env
-
-See `.env.example`. Critical:
-
-- `APP_PASSWORD` — gate for the personal dashboard (**required** in production)
-- `LIBSQL_URL` + `LIBSQL_AUTH_TOKEN` (or `TURSO_*`) — shared DB for Vercel + Fly
-- `BLOB_READ_WRITE_TOKEN` — durable media URLs on Vercel
-- `ZERNIO_API_KEY` + `ZERNIO_LINKEDIN_ACCOUNT_ID` — publishing (schedule fails hard when configured)
-- `CRON_SECRET` — protects `/api/cron/*` and `/api/worker/run`
-- `PLAYWRIGHT_ENABLED=true` on the Fly worker only
+Every script imports `scripts/_env.ts` first so it loads `.env.local` (and hits the same DB as the app).
 
 ## Architecture
 
-1. **Composer** schedules a post → local DB + Zernio (`firstComment` in platformSpecificData)
-2. **Calendar** table edits date/time → PATCH schedule (syncs Zernio when connected)
-3. **Jobs**: `repost` at publish+12h; optional `second_comment`
-4. **Cron** (Vercel): metrics sync every 4h; worker poll every 15m
-5. **Radar / Engage**: curated tables; score offline with Claude/Gemini → `POST /api/engage`
+1. **Composer** saves drafts / planned posts locally (`src/lib/posts.ts`). Status: `draft` → `scheduled` (= planned) → `published`
+2. **Calendar** reschedules planned posts (local only)
+3. **Activity sync** (`worker/activity-sync.ts` scrape → `src/lib/activity-ingest.ts` upsert): new posts inserted; planned/lossy rows matched by caption (±7d planned, ±2d published) get the live caption, URL and `published`; metrics snapshotted when changed; followers + display name recorded
+4. **Profile & voice** (`src/lib/profile.ts`, settings keys `profile_name`, `profile_headline`, `voice_inserts`) — per-install, edited in Settings; client reads via `useProfile()`
+5. **Zernio** (optional): daily `/api/cron/metrics` no-ops without a key
+6. **Radar / Engage**: curated tables; score offline → `POST /api/engage`
 
-## Figma
+## Env
 
-https://www.figma.com/design/UqIRLh3FLJGrQUVTCDszLk/LinkedWin
-
-## Notion
-
-- Spec: https://app.notion.com/p/3a729a7538718174b410e98a724ca6b0
-- Plan: https://app.notion.com/p/3a729a753871818588b9cb443da96e65
-
-## Capture LinkedIn session (worker)
-
-1. Locally: `npm run session:capture` (log in with **email + password**, not Google)
-2. Open `linkedin-session.json` and paste into Settings → Browser session
-3. Save and mark session healthy
-
-Avoid `Continue with Google` in Playwright — Google blocks OAuth in automated browsers.
+See `.env.example`. `APP_PASSWORD` (required in prod), `LIBSQL_URL` + `LIBSQL_AUTH_TOKEN`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`. Actions secrets: `LIBSQL_URL`, `LIBSQL_AUTH_TOKEN`.
 
 ## Gotchas
 
-- Zernio LinkedIn: put links in `firstComment`, not the caption
-- Document posts need `documentTitle` / media title
-- Native repost is ToS-gray — keep to 1/day
-- Local SQLite is fine for `npm run dev`; production must use remote libSQL + Blob so Vercel and Fly see the same data
+- Session capture: email + password only — Google blocks OAuth in automated browsers
+- LinkedIn's 2026 frontend has no `data-urn` cards: sync keys off `a[href*="/analytics/post-summary/urn:li:activity:"]` (own posts only) + `[data-testid="expandable-text-box"]`; `/recent-activity/shares/` crashes, use `/all/`
+- Social counts are the text of the action buttons (`Reaction button state…`/`Comment`/`Repost` aria-labels); empty = 0
+- No named functions inside `page.$$eval` callbacks — tsx injects `__name()`, which doesn't exist in the page
+- `/posts/…-share-<id>` URLs hold a share id, not the activity id — match on `activity:` ids only
+- Activity ids encode publish time: `Number(BigInt(id) >> 22n)` ms
+- Don't spoof user agents or call LinkedIn's internal API directly; read the rendered page only
+- `automation_jobs` table is legacy (posting removed) — created for old DBs, unused
+- Personal one-offs live in gitignored `local/`; keep the template free of personal paths

@@ -6,8 +6,7 @@ const COOKIE = "linkedwin_session";
 function isProductionHost() {
   return (
     process.env.NODE_ENV === "production" ||
-    process.env.VERCEL === "1" ||
-    Boolean(process.env.FLY_APP_NAME)
+    process.env.VERCEL === "1"
   );
 }
 
@@ -63,5 +62,5 @@ export async function isAuthenticated() {
 export function checkPassword(input: string) {
   const expected = resolveAppPassword();
   if (!expected) return false;
-  return input === expected;
+  return input.trim() === expected;
 }

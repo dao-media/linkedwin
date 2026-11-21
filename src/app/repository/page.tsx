@@ -9,6 +9,7 @@ import { db, ensureSchema } from "@/lib/db";
 import {
   computeEngagementRate,
   impressionsSourceFromRaw,
+  resolveEngagementTotal,
 } from "@/lib/metrics";
 import { metricsSnapshots, posts } from "@/lib/schema";
 
@@ -44,18 +45,22 @@ export default async function RepositoryPage({
     const reposts = snap?.reposts ?? shares;
     const impressions = snap?.impressions ?? null;
 
-    const engagements =
-      likes == null &&
-      comments == null &&
-      shares == null &&
-      saves == null &&
-      sends == null
-        ? null
-        : (likes ?? 0) +
-          (comments ?? 0) +
-          (shares ?? 0) +
-          (saves ?? 0) +
-          (sends ?? 0);
+    const breakdown =
+      (likes ?? 0) +
+      (comments ?? 0) +
+      (shares ?? 0) +
+      (saves ?? 0) +
+      (sends ?? 0);
+    const engagements = resolveEngagementTotal({
+      likes,
+      comments,
+      shares,
+      saves,
+      sends,
+      rawJson: snap?.rawJson,
+    });
+    // Hide zero reaction cells when we only have LinkedIn's aggregate total.
+    const showBreakdown = breakdown > 0;
 
     const engRate = computeEngagementRate({
       engagements,
@@ -76,15 +81,18 @@ export default async function RepositoryPage({
       mediaTitle: p.mediaTitle ?? null,
       linkedinPostUrl: p.linkedinPostUrl ?? null,
       topics: p.topics,
+      firstComment: p.firstComment,
+      secondComment: p.secondComment,
+      thirdComment: p.thirdComment,
       impressions,
       engRate,
       engagements,
-      likes,
-      comments,
-      shares,
-      saves,
-      sends,
-      reposts,
+      likes: showBreakdown ? likes : null,
+      comments: showBreakdown ? comments : null,
+      shares: showBreakdown ? shares : null,
+      saves: showBreakdown ? saves : null,
+      sends: showBreakdown ? sends : null,
+      reposts: showBreakdown ? reposts : null,
       followersAtPublish: p.followersAtPublish ?? null,
     });
   }

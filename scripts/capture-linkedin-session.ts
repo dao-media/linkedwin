@@ -7,6 +7,7 @@
  * Opens Chromium → log in with email/password (not Google) → when the feed
  * loads, storage is written to linkedin-session.json and imported into Settings.
  */
+import "./_env";
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";

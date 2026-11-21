@@ -1,6 +1,7 @@
 /**
- * LinkedIn browser automation for native repost + optional second comments.
- * Runs only when PLAYWRIGHT_ENABLED=true (Fly worker).
+ * Read-only LinkedIn browser context built from the stored session
+ * (Settings → LinkedIn session, or `npm run session:capture`).
+ * Used by activity sync; never posts, comments or reposts.
  */
 import { getSetting, setSetting } from "../src/lib/settings";
 
@@ -41,7 +42,7 @@ async function loadPlaywright() {
   }
 }
 
-async function withContext<T>(fn: (ctx: BrowserContext) => Promise<T>) {
+export async function withContext<T>(fn: (ctx: BrowserContext) => Promise<T>) {
   const raw = await getSetting("linkedin_session");
   const { parseStoredLinkedInSession } = await import(
     "../src/lib/linkedin-session"
@@ -68,45 +69,13 @@ async function withContext<T>(fn: (ctx: BrowserContext) => Promise<T>) {
     await ctx.close();
     return result;
   } catch (err) {
-    await setSetting("session_health", "expired");
+    // Only auth failures mean the session is bad; selector/timeouts are page-shape issues
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/session expired|login|authwall|checkpoint/i.test(msg)) {
+      await setSetting("session_health", "expired");
+    }
     throw err;
   } finally {
     await browser.close();
   }
-}
-
-export async function executeLinkedInRepost(payload: {
-  postId: string;
-  url: string | null;
-}) {
-  if (!payload.url) throw new Error("Missing LinkedIn post URL");
-  await withContext(async (ctx) => {
-    const page = await ctx.newPage();
-    await page.goto(payload.url!, { waitUntil: "domcontentloaded" });
-    const repost = page.getByRole("button", { name: /repost/i }).first();
-    await repost.click({ timeout: 15000 });
-    const confirm = page.getByRole("button", { name: /^repost$/i }).first();
-    if (await confirm.isVisible().catch(() => false)) {
-      await confirm.click();
-    }
-    await page.waitForTimeout(2000);
-  });
-}
-
-export async function executeLinkedInComment(payload: {
-  url: string;
-  comment: string;
-}) {
-  await withContext(async (ctx) => {
-    const page = await ctx.newPage();
-    await page.goto(payload.url, { waitUntil: "domcontentloaded" });
-    const box = page
-      .getByRole("textbox", { name: /comment|add a comment/i })
-      .first();
-    await box.click({ timeout: 15000 });
-    await box.fill(payload.comment);
-    const postBtn = page.getByRole("button", { name: /^post$/i }).first();
-    await postBtn.click();
-    await page.waitForTimeout(1500);
-  });
 }

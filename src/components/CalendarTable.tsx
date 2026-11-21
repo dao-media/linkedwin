@@ -690,7 +690,7 @@ export function CalendarTable({
         </div>
       )}
       <section>
-        <h2 className="type-h5 mb-3">Scheduled</h2>
+        <h2 className="type-h5 mb-3">Planned</h2>
         <PostTable
           rows={scheduled}
           emptyLabel="No scheduled posts. Schedule a draft or create one in Composer."

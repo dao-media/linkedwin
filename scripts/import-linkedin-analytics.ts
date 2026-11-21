@@ -1,6 +1,7 @@
+import "./_env";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { eq, like, sql } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db, ensureSchema } from "../src/lib/db";
 import {
@@ -133,9 +134,8 @@ async function main() {
     defval: null,
   }) as Record<string, unknown>[];
 
-  await db.delete(dailyMetrics).where(eq(dailyMetrics.source, "linkedin_export"));
-
   let dailyInserted = 0;
+  let dailyUpdated = 0;
   const dailyByDate = new Map<
     string,
     { impressions: number; engagements: number; newFollowers: number }
@@ -208,16 +208,36 @@ async function main() {
   for (const [date, v] of [...dailyByDate.entries()].sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
-    await db.insert(dailyMetrics).values({
-      id: randomUUID(),
-      date,
-      impressions: v.impressions,
-      engagements: v.engagements,
-      newFollowers: v.newFollowers,
-      source: "linkedin_export",
-      capturedAt: new Date().toISOString(),
-    });
-    dailyInserted += 1;
+    const existing = await db
+      .select()
+      .from(dailyMetrics)
+      .where(
+        and(eq(dailyMetrics.source, "linkedin_export"), eq(dailyMetrics.date, date)),
+      )
+      .get();
+    if (existing) {
+      await db
+        .update(dailyMetrics)
+        .set({
+          impressions: v.impressions,
+          engagements: v.engagements,
+          newFollowers: v.newFollowers,
+          capturedAt: new Date().toISOString(),
+        })
+        .where(eq(dailyMetrics.id, existing.id));
+      dailyUpdated += 1;
+    } else {
+      await db.insert(dailyMetrics).values({
+        id: randomUUID(),
+        date,
+        impressions: v.impressions,
+        engagements: v.engagements,
+        newFollowers: v.newFollowers,
+        source: "linkedin_export",
+        capturedAt: new Date().toISOString(),
+      });
+      dailyInserted += 1;
+    }
   }
 
   // Reconstruct cumulative followers (end total on last day).
@@ -228,19 +248,33 @@ async function main() {
   );
   let running = endTotal - sumNew;
 
-  await db
-    .delete(followerSnapshots)
-    .where(eq(followerSnapshots.source, "linkedin_export"));
-
   let followerPoints = 0;
   for (const date of orderedDates) {
     running += dailyByDate.get(date)?.newFollowers ?? 0;
-    await db.insert(followerSnapshots).values({
-      id: randomUUID(),
-      capturedAt: `${date}T16:00:00.000Z`,
-      followers: running,
-      source: "linkedin_export",
-    });
+    const capturedAt = `${date}T16:00:00.000Z`;
+    const existing = await db
+      .select()
+      .from(followerSnapshots)
+      .where(
+        and(
+          eq(followerSnapshots.source, "linkedin_export"),
+          like(followerSnapshots.capturedAt, `${date}%`),
+        ),
+      )
+      .get();
+    if (existing) {
+      await db
+        .update(followerSnapshots)
+        .set({ followers: running, capturedAt })
+        .where(eq(followerSnapshots.id, existing.id));
+    } else {
+      await db.insert(followerSnapshots).values({
+        id: randomUUID(),
+        capturedAt,
+        followers: running,
+        source: "linkedin_export",
+      });
+    }
     followerPoints += 1;
   }
 
@@ -336,7 +370,7 @@ async function main() {
     const shares = existing?.shares ?? 0;
     const saves = existing?.saves ?? 0;
     const sends = existing?.sends ?? 0;
-    const impressions = tp.impressions;
+    const impressions = Math.max(tp.impressions, existing?.impressions ?? 0);
     const engagements =
       tp.engagements || likes + comments + shares + saves + sends;
     const engagementRate =
@@ -381,14 +415,18 @@ async function main() {
 
     // Prefer LinkedIn canonical post URL when we matched.
     if (tp.url && post.linkedinPostUrl !== tp.url) {
-      await db
-        .update(posts)
-        .set({
-          linkedinPostUrl: tp.url,
-          zernioPostId: null,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(posts.id, post.id));
+      const patch: {
+        linkedinPostUrl: string;
+        updatedAt: string;
+        zernioPostId?: string | null;
+      } = {
+        linkedinPostUrl: tp.url,
+        updatedAt: new Date().toISOString(),
+      };
+      if (post.zernioPostId?.startsWith("favikon:")) {
+        patch.zernioPostId = null;
+      }
+      await db.update(posts).set(patch).where(eq(posts.id, post.id));
     }
 
     postsUpdated += 1;
@@ -426,6 +464,7 @@ async function main() {
       {
         xlsxPath,
         dailyInserted,
+        dailyUpdated,
         followerPoints,
         endFollowers: endTotal,
         startFollowers: endTotal - sumNew,

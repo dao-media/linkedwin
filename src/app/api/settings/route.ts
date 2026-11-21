@@ -3,7 +3,9 @@ import {
   linkedInSessionIsSet,
   normalizeLinkedInSessionInput,
 } from "@/lib/linkedin-session";
+import { getProfile } from "@/lib/profile";
 import { getSetting, setSetting } from "@/lib/settings";
+import { parseVoiceInserts } from "@/lib/voice";
 
 export async function GET() {
   const apiKey = await getSetting("zernio_api_key");
@@ -15,7 +17,19 @@ export async function GET() {
     sessionHealth = "expired";
   }
 
+  let activitySync: unknown = null;
+  try {
+    activitySync = JSON.parse((await getSetting("last_activity_sync_result")) ?? "null");
+  } catch {
+    activitySync = null;
+  }
+  const profile = await getProfile();
+
   return NextResponse.json({
+    profileName: (await getSetting("profile_name")) ?? "",
+    profileHeadline: profile.headline,
+    voiceInserts: profile.voice,
+    activitySync,
     zernioApiKeySet: Boolean(apiKey || process.env.ZERNIO_API_KEY),
     zernioAccountId:
       (await getSetting("zernio_linkedin_account_id")) ??
@@ -39,6 +53,15 @@ export async function POST(req: Request) {
   }
   if (body.zernioAccountId != null) {
     await setSetting("zernio_linkedin_account_id", String(body.zernioAccountId));
+  }
+  if (body.profileName != null) {
+    await setSetting("profile_name", String(body.profileName).trim());
+  }
+  if (body.profileHeadline != null) {
+    await setSetting("profile_headline", String(body.profileHeadline).trim());
+  }
+  if (body.voiceInserts != null) {
+    await setSetting("voice_inserts", JSON.stringify(parseVoiceInserts(JSON.stringify(body.voiceInserts))));
   }
   if (body.niches != null) {
     await setSetting("niches", String(body.niches));

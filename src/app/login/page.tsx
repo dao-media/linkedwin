@@ -18,7 +18,10 @@ export default function LoginPage() {
       body: JSON.stringify({ password }),
     });
     if (!res.ok) {
-      setError("Invalid password");
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setError(data?.error || `Login failed (${res.status})`);
       return;
     }
     router.push("/");
@@ -36,12 +39,12 @@ export default function LoginPage() {
             <Lock className="size-5" strokeWidth={1.2} aria-hidden />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">LinkedWin</h1>
-            <p className="text-sm text-[var(--muted)]">Personal Content HQ</p>
+            <h1 className="type-h1">LinkedWin</h1>
+            <p className="type-p-m text-[var(--muted)]">Personal Content HQ</p>
           </div>
         </div>
-        <label className="mb-4 block text-sm">
-          <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+        <label className="mb-4 block type-p-m">
+          <span className="mb-1 block type-label-m text-[var(--muted)]">
             Password
           </span>
           <input
@@ -52,10 +55,10 @@ export default function LoginPage() {
             autoFocus
           />
         </label>
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-3 type-p-m text-red-600">{error}</p>}
         <button
           type="submit"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-2.5 text-sm font-bold text-white"
+          className="type-btn-l inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] py-2.5 text-white"
         >
           <LogIn className="size-4" strokeWidth={1.2} aria-hidden />
           Enter

@@ -17,15 +17,13 @@ const schema = z
     mediaUrl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
     mediaTitle: z.string().nullable().optional(),
     topics: z.array(z.string()).optional(),
-    repostEnabled: z.boolean().optional(),
-    repostAfterHours: z.number().optional(),
     asDraft: z.boolean().optional(),
   })
   .superRefine((val, ctx) => {
     if (!val.asDraft && !val.scheduledFor) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "scheduledFor is required when scheduling",
+        message: "Pick a date to plan this post, or save it as a draft",
         path: ["scheduledFor"],
       });
     }

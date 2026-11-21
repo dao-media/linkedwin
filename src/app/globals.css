@@ -11,6 +11,43 @@
   --selected: #d9ebf7;
   --success: #1f8c61;
   --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
+
+  /* ——— Typography scale ——— */
+  --type-h1: 1.75rem; /* 28px */
+  --type-h1-sm: 1.5rem; /* 24px */
+  --type-h2: 1.375rem; /* 22px */
+  --type-h3: 1rem; /* 16px */
+  --type-h4: 0.9375rem; /* 15px */
+  --type-h5: 0.875rem; /* 14px */
+  --type-h6: 0.75rem; /* 12px */
+
+  --type-p-l: 0.875rem; /* 14px */
+  --type-p-m: 0.875rem; /* 14px */
+  --type-p-s: 0.75rem; /* 12px */
+
+  --type-label-l: 0.875rem; /* 14px */
+  --type-label-m: 0.75rem; /* 12px */
+  --type-label-s: 0.6875rem; /* 11px */
+
+  --type-section-l: 0.75rem; /* 12px */
+  --type-section-m: 0.6875rem; /* 11px */
+  --type-section-s: 0.625rem; /* 10px */
+
+  --type-btn-l: 0.875rem; /* 14px */
+  --type-btn-m: 0.875rem; /* 14px */
+  --type-btn-s: 0.75rem; /* 12px */
+
+  --type-menu: 0.875rem; /* 14px */
+  --type-stat: 1.75rem; /* 28px */
+  --type-micro: 0.5625rem; /* 9px — calendar day numbers only */
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  --tracking-tight: -0.025em;
+  --tracking-wide: 0.04em;
 }
 
 @theme inline {
@@ -23,4 +60,181 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-size: var(--type-p-m);
+  line-height: var(--leading-normal);
+  font-weight: 400;
+}
+
+/* ——— Semantic HTML headings ——— */
+h1,
+.type-h1 {
+  font-size: var(--type-h1-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  color: var(--ink);
+}
+
+@media (min-width: 768px) {
+  h1,
+  .type-h1 {
+    font-size: var(--type-h1);
+  }
+}
+
+h2,
+.type-h2 {
+  font-size: var(--type-h2);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  color: var(--ink);
+}
+
+h3,
+.type-h3 {
+  font-size: var(--type-h3);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+
+h4,
+.type-h4 {
+  font-size: var(--type-h4);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+
+h5,
+.type-h5 {
+  font-size: var(--type-h5);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+
+h6,
+.type-h6 {
+  font-size: var(--type-h6);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+
+/* ——— Paragraphs ——— */
+.type-p-l {
+  font-size: var(--type-p-l);
+  font-weight: 400;
+  line-height: var(--leading-relaxed);
+}
+
+.type-p-m {
+  font-size: var(--type-p-m);
+  font-weight: 400;
+  line-height: var(--leading-normal);
+}
+
+.type-p-s {
+  font-size: var(--type-p-s);
+  font-weight: 400;
+  line-height: var(--leading-normal);
+}
+
+/* ——— Labels (form / control) ——— */
+.type-label-l {
+  font-size: var(--type-label-l);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+}
+
+.type-label-m {
+  font-size: var(--type-label-m);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+.type-label-s {
+  font-size: var(--type-label-s);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+/* ——— Section / eyebrow labels ——— */
+.type-section-l {
+  font-size: var(--type-section-l);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-snug);
+  text-transform: uppercase;
+}
+
+.type-section-m {
+  font-size: var(--type-section-m);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-snug);
+  text-transform: uppercase;
+}
+
+.type-section-s {
+  font-size: var(--type-section-s);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--leading-snug);
+  text-transform: uppercase;
+}
+
+/* ——— Buttons ——— */
+.type-btn-l {
+  font-size: var(--type-btn-l);
+  font-weight: 700;
+  line-height: var(--leading-snug);
+}
+
+.type-btn-m {
+  font-size: var(--type-btn-m);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+.type-btn-s {
+  font-size: var(--type-btn-s);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+/* ——— Navigation / menu ——— */
+.type-menu {
+  font-size: var(--type-menu);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+}
+
+.type-menu-active {
+  font-size: var(--type-menu);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+/* ——— Display / dense ——— */
+.type-stat {
+  font-size: var(--type-stat);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.type-chip {
+  font-size: var(--type-section-s);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.type-micro {
+  font-size: var(--type-micro);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }

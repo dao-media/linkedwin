@@ -3,21 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n web,worker -c blue,magenta \"next dev\" \"tsx worker/process-jobs.ts\"",
-    "dev:web": "next dev",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "start:app": "concurrently -k -n web,worker -c blue,magenta \"next start\" \"tsx worker/process-jobs.ts\"",
     "lint": "eslint",
     "db:seed": "tsx scripts/seed.ts",
-    "import:favikon": "tsx scripts/import-favikon.ts",
     "import:linkedin": "tsx scripts/import-linkedin-analytics.ts",
-    "enrich:posts": "tsx scripts/enrich-posts-from-imports.ts",
     "session:capture": "tsx scripts/capture-linkedin-session.ts",
     "session:restore": "tsx scripts/restore-linkedin-session.ts",
-    "worker": "tsx worker/process-jobs.ts",
-    "worker:once": "tsx worker/process-jobs.ts --once",
-    "worker:dry": "WORKER_DRY_RUN=true tsx worker/process-jobs.ts --once"
+    "activity:sync": "tsx scripts/sync-linkedin-activity.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

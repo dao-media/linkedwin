@@ -28,6 +28,11 @@ export function formatCalendarDate(d: Date): string {
   return `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+/** e.g. SEPT 24 — same month labels as calendar, all caps */
+export function formatCalendarDateChip(d: Date): string {
+  return `${MONTH_LABELS[d.getMonth()].toUpperCase()} ${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** e.g. 07/24/2026 */
 export function formatLibraryDate(d: Date): string {
   const dd = String(d.getDate()).padStart(2, "0");
@@ -71,9 +76,18 @@ export function formatMonthLabel(monthKey: string): string {
 
 export function formatCompactNumber(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
-  return String(Math.round(n));
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) {
+    return `${sign}${(abs / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}${(abs / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return `${sign}${Math.round(abs)}`;
 }
 
 export function formatCalendarTime(d: Date): string {
@@ -85,8 +99,20 @@ export function formatCalendarTime(d: Date): string {
 
 export function truncateCaption(text: string, max = 22): string {
   const cleaned = text.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= max) return cleaned;
-  return `${cleaned.slice(0, Math.max(0, max - 3)).trimEnd()}...`;
+  // Use code points — titles often include mathematical bold / emoji (astral
+  // plane). String.slice by UTF-16 can split surrogates and hydrate differently
+  // on server vs client.
+  const chars = Array.from(cleaned);
+  if (chars.length <= max) return cleaned;
+  const cut = Math.max(0, max - 3);
+  return `${chars.slice(0, cut).join("").trimEnd()}...`;
+}
+
+/** Truncate by Unicode code point (safe for astral-plane glyphs). */
+export function truncateCodePoints(text: string, max: number): string {
+  const chars = Array.from(text);
+  if (chars.length <= max) return text;
+  return chars.slice(0, max).join("");
 }
 
 export function mediaLabel(

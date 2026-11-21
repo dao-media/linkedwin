@@ -29,7 +29,6 @@ export function ComposerForm() {
   const [comments, setComments] = useState<string[]>([""]);
   const [scheduledFor, setScheduledFor] = useState("");
   const [topics, setTopics] = useState("AI agents");
-  const [repostEnabled, setRepostEnabled] = useState(true);
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaType, setMediaType] = useState<ComposerMediaType | "">("");
   const [mediaTitle, setMediaTitle] = useState("");
@@ -156,7 +155,6 @@ export function ComposerForm() {
             .split(",")
             .map((t) => t.replace(/^#/, "").trim().toLowerCase())
             .filter(Boolean),
-          repostEnabled,
           mediaType: mediaType || null,
           mediaUrl: mediaUrl || null,
           mediaTitle: mediaTitle || null,
@@ -167,19 +165,13 @@ export function ComposerForm() {
       if (!res.ok) {
         throw new Error(
           body.error ??
-            (mode === "draft" ? "Failed to save draft" : "Failed to schedule"),
+            (mode === "draft" ? "Failed to save draft" : "Failed to plan post"),
         );
       }
       if (mode === "draft") {
         setOk("Draft saved. Redirecting to Calendar…");
       } else {
-        const armed = Boolean(body.post?.zernioPostId);
-        const n = comments.map((c) => c.trim()).filter(Boolean).length;
-        setOk(
-          armed
-            ? `Scheduled with Zernio. ${n ? `${n} pinned comment${n === 1 ? "" : "s"} + ` : ""}12h repost armed. Redirecting…`
-            : "Saved locally, but Zernio did not accept the schedule — check Settings. Redirecting…",
-        );
+        setOk("Added to your content calendar. Redirecting…");
       }
       setTimeout(() => router.push("/calendar"), 800);
     } catch (err) {
@@ -201,11 +193,11 @@ export function ComposerForm() {
         className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5"
       >
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+          <span className="type-label-m mb-1 block text-[var(--muted)]">
             Caption
           </span>
           <textarea
-            className="min-h-48 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] p-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="type-p-m min-h-48 w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] p-3 outline-none focus:border-[var(--accent)]"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onBlur={() => setContent((c) => lowercaseHashtagsInText(c))}
@@ -219,7 +211,7 @@ export function ComposerForm() {
 
         <section className="space-y-2.5">
           <div className="flex items-center gap-2">
-            <h3 className="shrink-0 text-xs font-semibold text-[var(--muted)]">
+            <h3 className="type-label-m shrink-0 text-[var(--muted)]">
               Saved footers
             </h3>
             <div className="h-px min-w-0 flex-1 bg-[var(--line)]" />
@@ -229,16 +221,16 @@ export function ComposerForm() {
                 setFooterError(null);
                 setFooterModal({ type: "create", seedBody: content.trim() });
               }}
-              className="shrink-0 rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--selected)]"
+              className="type-btn-s shrink-0 rounded-md bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)] hover:bg-[var(--selected)]"
             >
               + Save current as footer
             </button>
           </div>
 
           {!footersLoaded ? (
-            <p className="text-sm text-[var(--muted)]">Loading footers…</p>
+            <p className="type-p-m text-[var(--muted)]">Loading footers…</p>
           ) : footers.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">
+            <p className="type-p-m text-[var(--muted)]">
               No saved footers yet. Save a sign-off to reuse it.
             </p>
           ) : (
@@ -249,10 +241,10 @@ export function ComposerForm() {
                   className="flex items-center gap-3 rounded-lg border border-[var(--line)] bg-white px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--ink)]">
+                    <p className="type-label-l truncate text-[var(--ink)]">
                       {footer.name}
                     </p>
-                    <p className="truncate text-xs text-[var(--muted)]">
+                    <p className="type-p-s truncate text-[var(--muted)]">
                       {footer.body}
                     </p>
                   </div>
@@ -282,7 +274,7 @@ export function ComposerForm() {
                     <button
                       type="button"
                       onClick={() => insertFooter(footer.body)}
-                      className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90"
+                      className="type-btn-s rounded-md bg-[var(--accent)] px-2.5 py-1 text-white hover:opacity-90"
                     >
                       Insert
                     </button>
@@ -306,47 +298,39 @@ export function ComposerForm() {
 
         <PinnedCommentsFields comments={comments} onChange={updateComment} />
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
-              Publish at
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="type-p-m block">
+            <span className="type-label-m mb-1 block text-[var(--muted)]">
+              Planned for
             </span>
             <input
               type="datetime-local"
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+              className="type-p-m w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
               value={scheduledFor || defaultSchedule}
               onChange={(e) => setScheduledFor(e.target.value)}
             />
           </label>
-          <label className="block text-sm md:col-span-1">
-            <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+          <label className="type-p-m block md:col-span-1">
+            <span className="type-label-m mb-1 block text-[var(--muted)]">
               Topics (comma-separated)
             </span>
             <input
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+              className="type-p-m w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
               value={topics}
               onChange={(e) => setTopics(e.target.value)}
             />
           </label>
-          <label className="flex items-end gap-2 pb-2 text-sm">
-            <input
-              type="checkbox"
-              checked={repostEnabled}
-              onChange={(e) => setRepostEnabled(e.target.checked)}
-            />
-            Repost after 12 hours
-          </label>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {ok && <p className="text-sm text-[var(--success)]">{ok}</p>}
+        {error && <p className="type-p-m text-red-600">{error}</p>}
+        {ok && <p className="type-p-m text-[var(--success)]">{ok}</p>}
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={Boolean(saving) || !content.trim()}
             onClick={() => void save("draft")}
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--bg)] disabled:opacity-50"
+            className="type-btn-m inline-flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-4 py-2.5 text-[var(--ink)] hover:bg-[var(--bg)] disabled:opacity-50"
           >
             <FileText className="size-4" strokeWidth={1.2} aria-hidden />
             {saving === "draft" ? "Saving…" : "Save draft"}
@@ -354,10 +338,10 @@ export function ComposerForm() {
           <button
             type="submit"
             disabled={Boolean(saving) || !content.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            className="type-btn-l inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-white disabled:opacity-50"
           >
             <CalendarClock className="size-4" strokeWidth={1.2} aria-hidden />
-            {saving === "schedule" ? "Scheduling…" : "Schedule post"}
+            {saving === "schedule" ? "Saving…" : "Add to calendar"}
           </button>
         </div>
       </form>
