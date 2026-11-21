@@ -1,3 +1,4 @@
+import "./_env";
 import { createClient } from "@libsql/client";
 import { ensureSchema } from "../src/lib/db";
 

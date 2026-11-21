@@ -35,6 +35,7 @@ import {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DRAG_TYPE = "application/x-linkedwin-post-id";
+const NO_MOVES = new Map<string, string>();
 
 type PendingDrop = {
   post: CalendarRow;
@@ -96,7 +97,7 @@ function ChipMeta({
           aria-label={`${commentCount} pinned comment${commentCount === 1 ? "" : "s"}`}
         >
           <MessageCircle className="size-3 shrink-0" strokeWidth={1.2} aria-hidden />
-          <span className="text-[9px] font-semibold leading-none tabular-nums">
+          <span className="type-micro">
             {commentCount}
           </span>
         </span>
@@ -121,10 +122,33 @@ export function CalendarMonth({
   const [error, setError] = useState<string | null>(null);
   const [editorPost, setEditorPost] = useState<PostEditorData | null>(null);
   const [didDrag, setDidDrag] = useState(false);
+  // Optimistic reschedules (post id → new scheduledFor), shown until the
+  // router.refresh() after a save brings fresh props. The full page re-render
+  // can take seconds, and without this the drop looked like it did nothing.
+  // Tagged with the props they were made against, so fresh props drop them.
+  const [optimistic, setOptimistic] = useState<{
+    base: CalendarRow[];
+    moved: Map<string, string>;
+  } | null>(null);
+  const moved =
+    optimistic?.base === scheduled ? optimistic.moved : NO_MOVES;
+
+  const shown = useMemo(() => {
+    if (moved.size === 0) return { scheduled, drafts };
+    const rows = scheduled.map((row) =>
+      moved.has(row.id) ? { ...row, scheduledFor: moved.get(row.id)! } : row,
+    );
+    for (const row of drafts) {
+      if (moved.has(row.id)) {
+        rows.push({ ...row, status: "scheduled", scheduledFor: moved.get(row.id)! });
+      }
+    }
+    return { scheduled: rows, drafts: drafts.filter((row) => !moved.has(row.id)) };
+  }, [scheduled, drafts, moved]);
 
   const postsByDate = useMemo(() => {
     const map = new Map<string, CalendarRow[]>();
-    for (const row of scheduled) {
+    for (const row of shown.scheduled) {
       const key = localDateKey(row.scheduledFor);
       if (!key) continue;
       const list = map.get(key) ?? [];
@@ -137,7 +161,7 @@ export function CalendarMonth({
       );
     }
     return map;
-  }, [scheduled]);
+  }, [shown.scheduled]);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(cursor));
@@ -174,6 +198,14 @@ export function CalendarMonth({
       setError(result.error);
       return;
     }
+    const { post, date } = pending;
+    setOptimistic({
+      base: scheduled,
+      moved: new Map(moved).set(
+        post.id,
+        new Date(`${date}T${time}:00`).toISOString(),
+      ),
+    });
     setPending(null);
     router.refresh();
   }
@@ -181,7 +213,7 @@ export function CalendarMonth({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">{format(cursor, "MMMM yyyy")}</h2>
+        <h2 className="type-h5">{format(cursor, "MMMM yyyy")}</h2>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -201,7 +233,7 @@ export function CalendarMonth({
           </button>
           <button
             type="button"
-            className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-sm"
+            className="type-p-m rounded-md border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1"
             onClick={() => setCursor(startOfMonth(new Date()))}
           >
             Today
@@ -209,7 +241,7 @@ export function CalendarMonth({
         </div>
       </div>
 
-      <p className="text-xs text-[var(--muted)]">
+      <p className="type-p-s text-[var(--muted)]">
         Drag a post onto a date to reschedule. Top-right badges show media type
         and pinned comment count.
       </p>
@@ -219,7 +251,7 @@ export function CalendarMonth({
           {WEEKDAYS.map((d) => (
             <div
               key={d}
-              className="px-2 py-2 text-center text-xs font-semibold text-[var(--muted)]"
+              className="type-label-m px-2 py-2 text-center text-[var(--muted)]"
             >
               {d}
             </div>
@@ -261,7 +293,7 @@ export function CalendarMonth({
                 }}
               >
                 <div
-                  className={`mb-1 text-xs font-medium ${
+                  className={`type-p-s mb-1 ${
                     isToday
                       ? "inline-flex size-5 items-center justify-center rounded-full bg-[var(--accent)] text-white"
                       : inMonth
@@ -324,12 +356,12 @@ export function CalendarMonth({
                         title={`${postLabel(row)} — click to edit`}
                       >
                         <div className="flex items-center justify-between gap-1">
-                          <div className="min-w-0 truncate text-[10px] font-semibold text-[var(--accent)]">
+                          <div className="type-chip min-w-0 truncate text-[var(--accent)]">
                             {time}
                           </div>
                           <ChipMeta media={media} commentCount={commentCount} />
                         </div>
-                        <div className="mt-0.5 truncate text-[11px] leading-tight text-[var(--ink)]">
+                        <div className="type-label-s mt-0.5 truncate text-[var(--ink)]">
                           {truncateCaption(postLabel(row), 18)}
                         </div>
                       </div>
@@ -344,19 +376,19 @@ export function CalendarMonth({
 
       <section>
         <div className="mb-3 flex flex-wrap items-baseline gap-3">
-          <h2 className="text-sm font-semibold">Drafts</h2>
-          <p className="text-xs text-[var(--muted)]">
+          <h2 className="type-h5">Drafts</h2>
+          <p className="type-p-s text-[var(--muted)]">
             Drag a draft onto a date to schedule it.
           </p>
         </div>
         <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
-          {drafts.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-[var(--muted)]">
+          {shown.drafts.length === 0 ? (
+            <p className="type-p-m px-4 py-8 text-center text-[var(--muted)]">
               No drafts yet.
             </p>
           ) : (
             <ul>
-              {drafts.map((row) => {
+              {shown.drafts.map((row) => {
                 const dragging = draggingId === row.id;
                 return (
                   <li
@@ -394,10 +426,10 @@ export function CalendarMonth({
                     }`}
                     title="Click to edit · drag onto a date to schedule"
                   >
-                    <span className="min-w-0 truncate text-sm font-medium">
+                    <span className="type-label-l min-w-0 truncate">
                       {postLabel(row)}
                     </span>
-                    <span className="shrink-0 text-xs text-[var(--muted)]">
+                    <span className="type-p-s shrink-0 text-[var(--muted)]">
                       {row.scheduledFor
                         ? format(new Date(row.scheduledFor), "MMM d")
                         : "No date"}

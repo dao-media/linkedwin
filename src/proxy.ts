@@ -16,8 +16,7 @@ function secret() {
   if (!configured) {
     if (
       process.env.NODE_ENV === "production" ||
-      process.env.VERCEL === "1" ||
-      Boolean(process.env.FLY_APP_NAME)
+      process.env.VERCEL === "1"
     ) {
       throw new Error("APP_PASSWORD must be set in production");
     }

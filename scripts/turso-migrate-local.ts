@@ -2,6 +2,7 @@
  * Copy all tables from local data/linkedwin.db into the remote libSQL DB
  * configured by LIBSQL_URL + LIBSQL_AUTH_TOKEN.
  */
+import "./_env";
 import { createClient } from "@libsql/client";
 import path from "node:path";
 import { ensureSchema } from "../src/lib/db";

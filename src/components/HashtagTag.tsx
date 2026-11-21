@@ -11,7 +11,8 @@ export function HashtagTag({ tag, onClick, emphasized = false }: HashtagTagProps
   return (
     <button
       type="button"
-      className={`inline-flex max-w-full shrink-0 items-center truncate rounded-md border px-2 py-0.5 text-xs font-medium text-[var(--accent)] transition ${
+      data-flip
+      className={`type-btn-s inline-flex max-w-full shrink-0 items-center truncate rounded-md border px-2 py-0.5 text-[var(--accent)] ${
         emphasized
           ? "border-[var(--accent)] bg-[var(--selected)]"
           : "border-transparent bg-[var(--accent-soft)] hover:bg-[var(--selected)]"

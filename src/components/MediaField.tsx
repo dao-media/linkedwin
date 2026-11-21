@@ -152,12 +152,12 @@ export function MediaField({
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-xs font-semibold text-[var(--muted)]">Media</h3>
+        <h3 className="type-label-m text-[var(--muted)]">Media</h3>
         <div className="flex rounded-lg border border-[var(--line)] p-0.5">
           <button
             type="button"
             onClick={() => setSource("upload")}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+            className={`type-btn-s rounded-md px-2.5 py-1 transition ${
               source === "upload"
                 ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                 : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -168,7 +168,7 @@ export function MediaField({
           <button
             type="button"
             onClick={() => setSource("url")}
-            className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+            className={`type-btn-s rounded-md px-2.5 py-1 transition ${
               source === "url"
                 ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                 : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -207,30 +207,30 @@ export function MediaField({
             onChange={(e) => onFilePicked(e.target.files?.[0])}
           />
           {uploading ? (
-            <div className="inline-flex items-center gap-2 text-sm font-medium text-[var(--muted)]">
+            <div className="type-label-l inline-flex items-center gap-2 text-[var(--muted)]">
               <Loader2 className="size-4 animate-spin" strokeWidth={1.2} />
               Uploading…
             </div>
           ) : mediaUrl && fileLabel ? (
             <div className="flex flex-col items-center gap-2">
               <MediaKindIcon kind={previewKind} />
-              <p className="text-sm font-semibold text-[var(--ink)]">
+              <p className="type-h5 text-[var(--ink)]">
                 {fileLabel}
               </p>
-              <p className="max-w-full truncate text-xs text-[var(--muted)]">
+              <p className="type-p-s max-w-full truncate text-[var(--muted)]">
                 {mediaUrl}
               </p>
               <div className="mt-1 flex gap-2">
                 <label
                   htmlFor={inputId}
-                  className="cursor-pointer rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--ink)] hover:border-[var(--accent)]"
+                  className="type-btn-s cursor-pointer rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-[var(--ink)] hover:border-[var(--accent)]"
                 >
                   Replace
                 </label>
                 <button
                   type="button"
                   onClick={clearMedia}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--muted)] hover:border-[#c0392b] hover:text-[#c0392b]"
+                  className="type-btn-s inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-[var(--muted)] hover:border-[#c0392b] hover:text-[#c0392b]"
                 >
                   <X className="size-3.5" strokeWidth={1.2} aria-hidden />
                   Remove
@@ -244,10 +244,10 @@ export function MediaField({
                 strokeWidth={1.2}
                 aria-hidden
               />
-              <p className="mt-2 text-sm font-medium text-[var(--ink)]">
+              <p className="type-label-l mt-2 text-[var(--ink)]">
                 Drop an image, PDF, or video here
               </p>
-              <p className="mt-0.5 text-xs text-[var(--muted)]">
+              <p className="type-p-s mt-0.5 text-[var(--muted)]">
                 Max {formatBytes(maxBytes)}
                 {provider === "local"
                   ? " · local storage (set BLOB_READ_WRITE_TOKEN for cloud)"
@@ -255,7 +255,7 @@ export function MediaField({
               </p>
               <label
                 htmlFor={inputId}
-                className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+                className="type-btn-s mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-white hover:opacity-90"
               >
                 Choose file
               </label>
@@ -264,12 +264,12 @@ export function MediaField({
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+          <label className="type-p-m block">
+            <span className="type-label-m mb-1 block text-[var(--muted)]">
               Media type
             </span>
             <select
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+              className="type-p-m w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
               value={mediaType}
               onChange={(e) =>
                 onChange({
@@ -285,13 +285,13 @@ export function MediaField({
               <option value="document">Document (PDF)</option>
             </select>
           </label>
-          <label className="block text-sm md:col-span-2">
-            <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-[var(--muted)]">
+          <label className="type-p-m block md:col-span-2">
+            <span className="type-label-m mb-1 flex items-center gap-1 text-[var(--muted)]">
               <Link2 className="size-3.5" strokeWidth={1.2} aria-hidden />
               Hosted media URL
             </span>
             <input
-              className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+              className="type-p-m w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
               value={mediaUrl}
               onChange={(e) =>
                 onChange({
@@ -308,12 +308,12 @@ export function MediaField({
 
       {(mediaType === "document" ||
         (source === "upload" && previewKind === "document")) && (
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+        <label className="type-p-m block">
+          <span className="type-label-m mb-1 block text-[var(--muted)]">
             Document title
           </span>
           <input
-            className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
+            className="type-p-m w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2"
             value={mediaTitle}
             onChange={(e) =>
               onChange({
@@ -328,13 +328,13 @@ export function MediaField({
       )}
 
       {source === "upload" && mediaUrl && !fileLabel ? (
-        <p className="truncate text-xs text-[var(--muted)]">
+        <p className="type-p-s truncate text-[var(--muted)]">
           Attached: {mediaUrl}
         </p>
       ) : null}
 
       {uploadError ? (
-        <p className="text-sm text-red-600">{uploadError}</p>
+        <p className="type-p-m text-red-600">{uploadError}</p>
       ) : null}
     </section>
   );

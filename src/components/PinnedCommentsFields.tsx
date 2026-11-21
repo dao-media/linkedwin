@@ -37,31 +37,26 @@ export function PinnedCommentsFields({
 }: PinnedCommentsFieldsProps) {
   return (
     <fieldset className="space-y-3">
-      <legend className="mb-1 text-xs font-semibold text-[var(--muted)]">
+      <legend className="type-label-m mb-1 text-[var(--muted)]">
         Pinned comments
       </legend>
-      <p className="text-xs text-[var(--muted)]">
-        Auto-posted in order after publish · up to 3 · next blank appears as you
-        type
+      <p className="type-p-s text-[var(--muted)]">
+        Drafts to post yourself right after publishing · up to 3 · next blank
+        appears as you type
       </p>
       {comments.map((comment, index) => (
-        <label key={index} className="block text-sm">
-          <span className="mb-1 block text-xs font-medium text-[var(--ink)]">
+        <label key={index} className="type-p-m block">
+          <span className="type-label-m mb-1 block text-[var(--ink)]">
             Comment {index + 1}
-            {index === 0 ? (
+            {index === 0 && (
               <span className="font-normal text-[var(--muted)]">
                 {" "}
-                · via Zernio
-              </span>
-            ) : (
-              <span className="font-normal text-[var(--muted)]">
-                {" "}
-                · via worker
+                · pin this one
               </span>
             )}
           </span>
           <textarea
-            className="min-h-16 w-full rounded-lg border border-[var(--line)] bg-white p-3 text-sm"
+            className="type-p-m min-h-16 w-full rounded-lg border border-[var(--line)] bg-white p-3"
             value={comment}
             onChange={(e) => onChange(index, e.target.value)}
             placeholder={

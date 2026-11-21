@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Expand, Eye, TrendingUp, Users } from "lucide-react";
+import { Eye, Maximize2, TrendingUp, Users } from "lucide-react";
 import { PeriodChips } from "@/components/PeriodChips";
 import {
   PostPreviewModal,
@@ -146,31 +146,29 @@ export function TrendsView({ data }: { data: Dashboard }) {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-          <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+          <div className="type-p-s flex items-center gap-2 text-[var(--muted)]">
             <Users className="size-3.5" strokeWidth={1.2} aria-hidden />
             Followers
           </div>
-          <div className="mt-1 text-[28px] font-bold">
-            {data.widgets.followers != null
-              ? data.widgets.followers.toLocaleString()
-              : "—"}
+          <div className="type-stat mt-1">
+            {formatCompactNumber(data.widgets.followers)}
           </div>
           {deltaLabel ? (
-            <div className="mt-1 text-xs font-semibold text-[var(--success)]">
+            <div className="type-btn-s mt-1 text-[var(--success)]">
               {deltaLabel}
             </div>
           ) : null}
         </div>
 
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-          <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+          <div className="type-p-s flex items-center gap-2 text-[var(--muted)]">
             <Eye className="size-3.5" strokeWidth={1.2} aria-hidden />
             Average impressions
           </div>
-          <div className="mt-1 text-[28px] font-bold">
+          <div className="type-stat mt-1">
             {formatCompactNumber(data.widgets.avgImpressionsPerWeek)}
           </div>
-          <div className="mt-1 text-xs text-[var(--muted)]">
+          <div className="type-p-s mt-1 text-[var(--muted)]">
             Per week · trailing-month average
           </div>
         </div>
@@ -181,17 +179,17 @@ export function TrendsView({ data }: { data: Dashboard }) {
           onClick={() => top && setPreview(toPreview(top))}
           className="rounded-xl border border-[var(--accent)] bg-[var(--surface)] p-5 text-left transition hover:bg-[var(--accent-soft)] disabled:cursor-default disabled:border-[var(--line)] disabled:hover:bg-[var(--surface)]"
         >
-          <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+          <div className="type-p-s flex items-center gap-2 text-[var(--muted)]">
             <TrendingUp className="size-3.5" strokeWidth={1.2} aria-hidden />
             Top post of the week
           </div>
-          <div className="mt-1 line-clamp-2 text-base font-semibold text-[var(--ink)]">
+          <div className="type-h3 mt-1 line-clamp-2 text-[var(--ink)]">
             {top?.title ?? "No published posts this week"}
           </div>
           {top ? (
-            <div className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]">
+            <div className="type-btn-s mt-2 inline-flex items-center gap-1 text-[var(--accent)]">
               {formatCompactNumber(top.impressions)} impr · View preview
-              <Expand className="size-3.5 shrink-0" strokeWidth={1.2} aria-hidden />
+              <Maximize2 size={14} strokeWidth={1.2} className="shrink-0" aria-hidden />
             </div>
           ) : null}
         </button>
@@ -244,8 +242,8 @@ export function TrendsView({ data }: { data: Dashboard }) {
       <section className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-[var(--ink)]">Leaders</h2>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
+            <h2 className="type-h5 text-[var(--ink)]">Leaders</h2>
+            <p className="type-p-s mt-0.5 text-[var(--muted)]">
               Period applies to every tab
             </p>
           </div>
@@ -273,8 +271,8 @@ export function TrendsView({ data }: { data: Dashboard }) {
                 onClick={() => setTab(t.id)}
                 className={
                   active
-                    ? "rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]"
-                    : "rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
+                    ? "type-btn-s rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[var(--accent)]"
+                    : "type-p-s rounded-full border border-transparent px-3 py-1.5 text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
                 }
               >
                 {t.label}
@@ -286,20 +284,20 @@ export function TrendsView({ data }: { data: Dashboard }) {
         {tab === "hashtags" ? (
           <ul className="divide-y divide-[var(--line)]">
             {(leaders?.hashtags ?? []).length === 0 && (
-              <li className="py-6 text-sm text-[var(--muted)]">
+              <li className="type-p-m py-6 text-[var(--muted)]">
                 No hashtag data for this period.
               </li>
             )}
             {(leaders?.hashtags ?? []).map((row, i) => (
               <li
                 key={row.tag}
-                className="flex items-center gap-3 py-2.5 text-sm"
+                className="type-p-m flex items-center gap-3 py-2.5"
               >
-                <span className="w-6 shrink-0 text-xs font-semibold text-[var(--muted)]">
+                <span className="type-btn-s w-6 shrink-0 text-[var(--muted)]">
                   {i + 1}
                 </span>
                 <HashtagTag tag={row.tag} onClick={openHashtag} />
-                <span className="ml-auto shrink-0 text-xs text-[var(--muted)]">
+                <span className="type-p-s ml-auto shrink-0 text-[var(--muted)]">
                   {formatCompactNumber(row.avgImpressions)} avg impr ·{" "}
                   {row.posts} posts
                 </span>
@@ -309,30 +307,30 @@ export function TrendsView({ data }: { data: Dashboard }) {
         ) : (
           <ul className="divide-y divide-[var(--line)]">
             {postRows.length === 0 && (
-              <li className="py-6 text-sm text-[var(--muted)]">
+              <li className="type-p-m py-6 text-[var(--muted)]">
                 No posts for this period.
               </li>
             )}
             {postRows.map((post, i) => (
               <li
                 key={post.id}
-                className="flex items-center gap-3 py-2.5 text-sm"
+                className="type-p-m flex items-center gap-3 py-2.5"
               >
-                <span className="w-6 shrink-0 text-xs font-semibold text-[var(--muted)]">
+                <span className="type-btn-s w-6 shrink-0 text-[var(--muted)]">
                   {i + 1}
                 </span>
-                <span className="min-w-0 flex-1 truncate font-medium text-[var(--ink)]">
+                <span className="type-label-l min-w-0 flex-1 truncate text-[var(--ink)]">
                   {post.title}
                 </span>
-                <span className="shrink-0 text-xs text-[var(--muted)]">
+                <span className="type-p-s shrink-0 text-[var(--muted)]">
                   {metricForTab(tab, post)}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPreview(toPreview(post))}
-                  className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
+                  className="type-btn-s inline-flex shrink-0 items-center gap-1 text-[var(--accent)] hover:underline"
                 >
-                  <Expand className="size-3.5 shrink-0" strokeWidth={1.2} aria-hidden />
+                  <Maximize2 size={14} strokeWidth={1.2} className="shrink-0" aria-hidden />
                   Preview
                 </button>
               </li>

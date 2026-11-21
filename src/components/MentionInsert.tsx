@@ -121,11 +121,11 @@ export function MentionInsert({ onInsert }: MentionInsertProps) {
 
   return (
     <div className="rounded-lg border border-[var(--line)] bg-white p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)]">
+      <div className="type-label-m mb-2 flex items-center gap-1.5 text-[var(--accent)]">
         <AtSign className="size-3.5" strokeWidth={1.2} aria-hidden />
         Tag LinkedIn account
       </div>
-      <p className="mb-2 text-[11px] text-[var(--muted)]">
+      <p className="type-label-s mb-2 text-[var(--muted)]">
         Paste a profile or company URL. Display name must match LinkedIn exactly
         for person tags to be clickable. New tags are saved for reuse.
       </p>
@@ -144,7 +144,7 @@ export function MentionInsert({ onInsert }: MentionInsertProps) {
                   setLast(m.mentionFormat);
                   setError(null);
                 }}
-                className="max-w-[12rem] truncate py-1 text-left text-xs font-semibold text-[var(--accent)] hover:underline"
+                className="type-btn-s max-w-[12rem] truncate py-1 text-left text-[var(--accent)] hover:underline"
                 title={m.mentionFormat}
               >
                 @{m.label}
@@ -165,14 +165,14 @@ export function MentionInsert({ onInsert }: MentionInsertProps) {
       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
         <input
           type="url"
-          className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5 text-sm"
+          className="type-p-m w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5"
           placeholder="linkedin.com/in/…"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
         <input
           type="text"
-          className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5 text-sm"
+          className="type-p-m w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5"
           placeholder="Display name (people)"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
@@ -181,7 +181,7 @@ export function MentionInsert({ onInsert }: MentionInsertProps) {
           type="button"
           disabled={busy || !url.trim()}
           onClick={() => void resolve()}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          className="type-btn-s inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-1.5 text-white disabled:opacity-50"
         >
           {busy ? (
             <Loader2 className="size-3.5 animate-spin" strokeWidth={1.2} />
@@ -190,12 +190,12 @@ export function MentionInsert({ onInsert }: MentionInsertProps) {
         </button>
       </div>
       {error ? (
-        <p className="mt-2 text-xs text-red-600" role="alert">
+        <p className="type-p-s mt-2 text-red-600" role="alert">
           {error}
         </p>
       ) : null}
       {last ? (
-        <p className="mt-2 truncate text-[11px] text-[var(--muted)]">
+        <p className="type-label-s mt-2 truncate text-[var(--muted)]">
           Inserted {last}
         </p>
       ) : null}

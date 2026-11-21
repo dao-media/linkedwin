@@ -1,16 +1,17 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import {
   extractHashtags,
   normalizeHashtagKey,
+  truncateCodePoints,
 } from "./calendar-format";
 import { db, ensureSchema } from "./db";
 import {
   computeEngagementRate,
   impressionsSourceFromRaw,
+  resolveEngagementTotal,
 } from "./metrics";
 import {
-  automationJobs,
   dailyMetrics,
   followerSnapshots,
   metricsSnapshots,
@@ -86,7 +87,7 @@ function inRange(iso: string | null | undefined, start: string | null): boolean 
 function toSummary(row: PostMetrics): TrendsPostSummary {
   return {
     id: row.post.id,
-    title: row.post.title || row.post.content.slice(0, 80) || "Untitled",
+    title: row.post.title || truncateCodePoints(row.post.content, 80) || "Untitled",
     content: row.post.content,
     mediaType: row.post.mediaType,
     mediaUrl: row.post.mediaUrl,
@@ -111,7 +112,7 @@ function toSummary(row: PostMetrics): TrendsPostSummary {
 
 export async function recordFollowerSnapshot(
   followers: number,
-  source: "settings" | "publish" | "zernio" = "settings",
+  source: "settings" | "publish" | "zernio" | "linkedin" = "settings",
   capturedAt = new Date().toISOString(),
 ) {
   if (!Number.isFinite(followers) || followers < 0) return;
@@ -147,16 +148,6 @@ async function loadPublishedWithMetrics(): Promise<PostMetrics[]> {
     .where(eq(posts.status, "published"))
     .all();
 
-  const ownRepostCounts = new Map<string, number>();
-  const jobs = await db
-    .select()
-    .from(automationJobs)
-    .where(and(eq(automationJobs.type, "repost"), eq(automationJobs.status, "done")))
-    .all();
-  for (const j of jobs) {
-    ownRepostCounts.set(j.postId, (ownRepostCounts.get(j.postId) ?? 0) + 1);
-  }
-
   const out: PostMetrics[] = [];
   for (const post of published) {
     const snap = await db
@@ -173,9 +164,16 @@ async function loadPublishedWithMetrics(): Promise<PostMetrics[]> {
     const saves = snap?.saves ?? 0;
     const sends = snap?.sends ?? 0;
     const reposts = snap?.reposts ?? shares;
-    const own = ownRepostCounts.get(post.id) ?? 0;
-    const organicReposts = Math.max(0, reposts - own);
-    const engagements = likes + comments + shares + saves + sends;
+    const organicReposts = reposts;
+    const engagements =
+      resolveEngagementTotal({
+        likes,
+        comments,
+        shares,
+        saves,
+        sends,
+        rawJson: snap?.rawJson,
+      }) ?? 0;
     const engagementRate =
       computeEngagementRate({
         engagements,

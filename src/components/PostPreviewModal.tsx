@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useProfile } from "@/lib/use-profile";
 import {
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   FileText,
   Image as ImageIcon,
@@ -50,6 +53,12 @@ type PostPreviewModalProps = {
   /** When set (e.g. Trends leaders), sticky strip above the scroll body. */
   stats?: PostPreviewStats | null;
   onHashtagClick?: (tag: string) => void;
+  /** Cycle to the previous post in the current list (wraps). */
+  onPrev?: () => void;
+  /** Cycle to the next post in the current list (wraps). */
+  onNext?: () => void;
+  /** Optional counter label, e.g. "3 / 42". */
+  positionLabel?: string | null;
 };
 
 function commentList(post: PostPreviewData) {
@@ -98,7 +107,7 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
       <img
         src={url}
         alt={title}
-        className="max-h-52 w-full bg-[#f3f2ef] object-contain"
+        className="block h-auto w-full bg-[#f3f2ef] object-contain"
       />
     );
   }
@@ -108,7 +117,7 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
       <video
         src={url}
         controls
-        className="max-h-52 w-full bg-black"
+        className="block h-auto w-full bg-black"
         preload="metadata"
       />
     );
@@ -117,18 +126,18 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
   if (isDoc && url && isPdfUrl(url)) {
     return (
       <div className="flex flex-col">
-        <div className="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--bg)] px-4 py-2 text-sm">
+        <div className="type-p-m flex items-center gap-2 border-b border-[var(--line)] bg-[var(--bg)] px-4 py-2">
           <FileText
             className="size-4 shrink-0 text-[var(--accent)]"
             strokeWidth={1.2}
             aria-hidden
           />
-          <span className="min-w-0 flex-1 truncate font-medium">{title}</span>
+          <span className="type-label-l min-w-0 flex-1 truncate">{title}</span>
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
+            className="type-btn-s inline-flex shrink-0 items-center gap-1 text-[var(--accent)] hover:underline"
           >
             Open
             <ExternalLink className="size-3" strokeWidth={1.2} aria-hidden />
@@ -137,7 +146,7 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
         <iframe
           title={title}
           src={url}
-          className="h-52 w-full border-0 bg-[#f3f2ef]"
+          className="aspect-[3/4] w-full border-0 bg-[#f3f2ef]"
         />
       </div>
     );
@@ -151,19 +160,19 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
           strokeWidth={1.2}
           aria-hidden
         />
-        <p className="text-sm font-medium text-[var(--ink)]">{title}</p>
+        <p className="type-label-l text-[var(--ink)]">{title}</p>
         {url ? (
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
+            className="type-btn-s inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
           >
             Open attachment
             <ExternalLink className="size-3" strokeWidth={1.2} aria-hidden />
           </a>
         ) : (
-          <p className="text-xs text-[var(--muted)]">Document attached</p>
+          <p className="type-p-s text-[var(--muted)]">Document attached</p>
         )}
       </div>
     );
@@ -173,18 +182,18 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
     return (
       <div className="flex min-h-32 flex-col items-center justify-center gap-2 bg-black/90 px-6 py-8 text-center text-white">
         <Video className="size-10 opacity-70" strokeWidth={1.2} aria-hidden />
-        <p className="text-sm font-medium">{title}</p>
+        <p className="type-label-l">{title}</p>
         {url ? (
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="text-xs font-semibold text-[var(--accent-soft)] hover:underline"
+            className="type-btn-s text-[var(--accent-soft)] hover:underline"
           >
             Open video
           </a>
         ) : (
-          <p className="text-xs opacity-70">Video attached</p>
+          <p className="type-p-s opacity-70">Video attached</p>
         )}
       </div>
     );
@@ -198,8 +207,8 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
           strokeWidth={1.2}
           aria-hidden
         />
-        <p className="text-sm font-medium text-[var(--ink)]">{title}</p>
-        <p className="text-xs text-[var(--muted)]">Image attached</p>
+        <p className="type-label-l text-[var(--ink)]">{title}</p>
+        <p className="type-p-s text-[var(--muted)]">Image attached</p>
       </div>
     );
   }
@@ -213,7 +222,7 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
           aria-hidden
         />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <p className="type-section-l text-[var(--muted)]">
             Link
           </p>
           {url ? (
@@ -221,12 +230,12 @@ function MediaPanel({ post }: { post: PostPreviewData }) {
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 block break-all text-sm font-semibold text-[var(--accent)] hover:underline"
+              className="type-btn-m mt-1 block break-all text-[var(--accent)] hover:underline"
             >
               {url}
             </a>
           ) : (
-            <p className="mt-1 text-sm text-[var(--ink)]">{title}</p>
+            <p className="type-p-m mt-1 text-[var(--ink)]">{title}</p>
           )}
         </div>
       </div>
@@ -252,10 +261,10 @@ function StatsStrip({ stats }: { stats: PostPreviewStats }) {
         ] as const
       ).map(([label, value]) => (
         <div key={label} className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <div className="type-section-s text-[var(--muted)]">
             {label}
           </div>
-          <div className="truncate text-sm font-bold text-[var(--ink)]">
+          <div className="type-btn-l truncate text-[var(--ink)]">
             {value}
           </div>
         </div>
@@ -279,7 +288,7 @@ function CaptionBlock({
   return (
     <section className="border-b border-[var(--line)] px-4 py-3">
       <p
-        className={`whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--ink)] ${
+        className={`type-p-l whitespace-pre-wrap text-[var(--ink)] ${
           !expanded && canExpand ? "line-clamp-4" : ""
         }`}
       >
@@ -288,7 +297,7 @@ function CaptionBlock({
       {canExpand ? (
         <button
           type="button"
-          className="mt-2 text-[13px] font-semibold text-[var(--accent)] hover:underline"
+          className="type-btn-s mt-2 text-[var(--accent)] hover:underline"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
         >
@@ -303,7 +312,7 @@ function CaptionBlock({
             ) : (
               <span
                 key={tag}
-                className="text-[13px] font-medium text-[var(--accent)]"
+                className="type-p-l text-[var(--accent)]"
               >
                 {tag}
               </span>
@@ -320,6 +329,9 @@ export function PostPreviewModal({
   onClose,
   stats,
   onHashtagClick,
+  onPrev,
+  onNext,
+  positionLabel,
 }: PostPreviewModalProps) {
   const comments = commentList(post);
   const hashtags = useMemo(
@@ -329,17 +341,31 @@ export function PostPreviewModal({
   const hasMedia = Boolean(post.mediaUrl?.trim() || post.mediaType?.trim());
   const footer = post.footer?.trim() ?? "";
   const caption = post.content.trim() || "—";
+  const canCycle = Boolean(onPrev && onNext);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key === "ArrowLeft" && onPrev) {
+        e.preventDefault();
+        onPrev();
+        return;
+      }
+      if (e.key === "ArrowRight" && onNext) {
+        e.preventDefault();
+        onNext();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, onPrev, onNext]);
 
-  const author = post.authorName ?? "Dane O'Leary";
-  const headline = post.authorHeadline ?? "Content ops";
+  const profile = useProfile();
+  const author = post.authorName ?? profile.name;
+  const headline = post.authorHeadline ?? profile.headline;
   const initials = author
     .split(/\s+/)
     .filter(Boolean)
@@ -355,6 +381,20 @@ export function PostPreviewModal({
       aria-labelledby="post-preview-title"
       onClick={onClose}
     >
+      {canCycle ? (
+        <button
+          type="button"
+          className="type-btn-s absolute left-2 top-1/2 z-10 inline-flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] shadow-md transition-colors hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] active:scale-[0.98] sm:left-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPrev?.();
+          }}
+          aria-label="Previous post"
+        >
+          <ChevronLeft className="size-5" strokeWidth={1.4} aria-hidden />
+        </button>
+      ) : null}
+
       <div
         className={`flex ${CARD_HEIGHT_CLASS} ${CARD_WIDTH_CLASS} flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-xl`}
         onClick={(e) => e.stopPropagation()}
@@ -363,7 +403,7 @@ export function PostPreviewModal({
 
         <header className="flex shrink-0 items-start gap-3 border-b border-[var(--line)] px-4 py-3">
           <div
-            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)]"
+            className="type-btn-l flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]"
             aria-hidden
           >
             {initials || "LW"}
@@ -371,17 +411,18 @@ export function PostPreviewModal({
           <div className="min-w-0 flex-1">
             <h2
               id="post-preview-title"
-              className="truncate text-[15px] font-semibold text-[var(--ink)]"
+              className="type-h4 truncate text-[var(--ink)]"
             >
               {author}
             </h2>
-            <p className="truncate text-xs text-[var(--muted)]">
-              {headline} · Preview
+            <p className="type-p-s truncate text-[var(--muted)]">
+              {headline}
+              {positionLabel ? ` · ${positionLabel}` : " · Preview"}
             </p>
           </div>
           <button
             type="button"
-            className="rounded-md p-1 text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
+            className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] active:scale-[0.98]"
             onClick={onClose}
             aria-label="Close preview"
           >
@@ -399,10 +440,10 @@ export function PostPreviewModal({
 
           {footer ? (
             <section className="border-b border-[var(--line)] px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <p className="type-section-m text-[var(--muted)]">
                 Footer
               </p>
-              <p className="mt-1.5 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--ink)]">
+              <p className="type-p-l mt-1.5 whitespace-pre-wrap text-[var(--ink)]">
                 {footer}
               </p>
             </section>
@@ -410,32 +451,32 @@ export function PostPreviewModal({
 
           {hasMedia ? (
             <section className="border-b border-[var(--line)]">
-              <MediaPanel post={post} />
+              <MediaPanel key={`media-${post.id}`} post={post} />
             </section>
           ) : null}
 
           {comments.length > 0 ? (
             <section className="px-4 py-3">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <p className="type-section-m mb-3 text-[var(--muted)]">
                 Pinned comments
               </p>
               <ul className="space-y-3">
                 {comments.map((body, i) => (
                   <li
-                    key={`${i}-${body.slice(0, 24)}`}
+                    key={`${post.id}-${i}-${body.slice(0, 24)}`}
                     className="flex gap-2.5"
                   >
                     <div
-                      className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]"
+                      className="type-chip mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]"
                       aria-hidden
                     >
                       {initials || "LW"}
                     </div>
                     <div className="min-w-0 flex-1 rounded-xl bg-[var(--bg)] px-3 py-2">
-                      <p className="text-xs font-semibold text-[var(--ink)]">
+                      <p className="type-label-m text-[var(--ink)]">
                         {author}
                       </p>
-                      <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--ink)]">
+                      <p className="type-p-l mt-0.5 whitespace-pre-wrap text-[var(--ink)]">
                         {body}
                       </p>
                     </div>
@@ -446,6 +487,20 @@ export function PostPreviewModal({
           ) : null}
         </div>
       </div>
+
+      {canCycle ? (
+        <button
+          type="button"
+          className="type-btn-s absolute right-2 top-1/2 z-10 inline-flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] shadow-md transition-colors hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] active:scale-[0.98] sm:right-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNext?.();
+          }}
+          aria-label="Next post"
+        >
+          <ChevronRight className="size-5" strokeWidth={1.4} aria-hidden />
+        </button>
+      ) : null}
     </div>
   );
 }

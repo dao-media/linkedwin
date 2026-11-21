@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { DateRangeSelect } from "@/components/DateRangeSelect";
-import { HashtagTag } from "@/components/HashtagTag";
+import { OverviewTopHashtags } from "@/components/OverviewTopHashtags";
+import { SetupChecklist } from "@/components/SetupChecklist";
 import { getOverviewStats } from "@/lib/analytics";
 import {
   formatCalendarDateChip,
@@ -45,7 +46,7 @@ export default async function OverviewPage({
       icon: ListChecks,
     },
     {
-      label: "Queued",
+      label: "Planned",
       value: formatCompactNumber(stats.scheduledCount),
       icon: CalendarClock,
     },
@@ -61,6 +62,7 @@ export default async function OverviewPage({
         </Suspense>
       }
     >
+      <SetupChecklist />
       <div className="mb-6 grid gap-4 md:grid-cols-4">
         {cards.map(({ label, value, icon: Icon }) => (
           <div
@@ -121,28 +123,10 @@ export default async function OverviewPage({
             />
             Top hashtags
           </h2>
-          <ul className="max-h-44 divide-y divide-[var(--line)] overflow-y-auto">
-            {stats.topHashtags.length === 0 && (
-              <li className="py-2 type-p-m text-[var(--muted)]">
-                No hashtag data yet
-              </li>
-            )}
-            {stats.topHashtags.map((row, i) => (
-              <li
-                key={row.tag}
-                className="flex items-center gap-3 py-2.5 type-p-m"
-              >
-                <span className="w-6 shrink-0 type-label-m text-[var(--muted)]">
-                  {i + 1}
-                </span>
-                <HashtagTag tag={row.tag} />
-                <span className="ml-auto shrink-0 type-p-s text-[var(--muted)]">
-                  {formatCompactNumber(row.avgImpressions)} avg impr ·{" "}
-                  {row.posts} posts
-                </span>
-              </li>
-            ))}
-          </ul>
+          <OverviewTopHashtags
+            rows={stats.topHashtags}
+            posts={stats.hashtagPosts}
+          />
         </div>
       </div>
 

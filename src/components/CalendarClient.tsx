@@ -47,7 +47,7 @@ export function CalendarClient({
     >
       {view === "list" ? (
         <>
-          <p className="mb-4 flex items-start gap-2 text-sm text-[var(--muted)]">
+          <p className="mb-4 flex items-start gap-2 type-p-m text-[var(--muted)]">
             <MousePointerClick
               className="mt-0.5 size-4 shrink-0 text-[var(--accent)]"
               strokeWidth={1.2}

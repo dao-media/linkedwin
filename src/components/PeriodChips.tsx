@@ -28,8 +28,8 @@ export function PeriodChips<T extends string>({
             onClick={() => onChange(opt.id as T)}
             className={
               active
-                ? "rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent)]"
-                : "rounded-full border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                ? "type-label-s rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1 text-[var(--accent)]"
+                : "type-label-s rounded-full border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1 text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             }
           >
             {opt.label}

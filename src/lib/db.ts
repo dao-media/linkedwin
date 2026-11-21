@@ -19,10 +19,10 @@ function resolveLibsqlConfig(): { url: string; authToken?: string } {
   }
 
   const onSharedHost =
-    process.env.VERCEL === "1" || Boolean(process.env.FLY_APP_NAME);
+    process.env.VERCEL === "1" || process.env.GITHUB_ACTIONS === "true";
   if (onSharedHost && process.env.ALLOW_LOCAL_SQLITE !== "true") {
     throw new Error(
-      "Remote libSQL is required on Vercel/Fly so the web app and worker share data. Set LIBSQL_URL (or TURSO_DATABASE_URL) and LIBSQL_AUTH_TOKEN (or TURSO_AUTH_TOKEN).",
+      "Remote libSQL is required on Vercel and in the GitHub sync Action so both see the same data. Set LIBSQL_URL (or TURSO_DATABASE_URL) and LIBSQL_AUTH_TOKEN (or TURSO_AUTH_TOKEN).",
     );
   }
 
@@ -88,6 +88,7 @@ export async function ensureSchema() {
       raw_json TEXT
     );
 
+    -- Legacy (posting removed); kept so older databases still open cleanly
     CREATE TABLE IF NOT EXISTS automation_jobs (
       id TEXT PRIMARY KEY,
       post_id TEXT NOT NULL REFERENCES posts(id),

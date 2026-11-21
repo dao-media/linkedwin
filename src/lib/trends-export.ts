@@ -25,6 +25,68 @@ export type ReferenceRankId = (typeof REFERENCE_RANK_OPTIONS)[number]["id"];
 export const REFERENCE_COUNT_OPTIONS = [5, 10, 25, 50] as const;
 export type ReferenceCount = (typeof REFERENCE_COUNT_OPTIONS)[number];
 
+/** Discrete minimum thresholds for Content Reference filters. */
+export const MIN_COMMENTS_STEPS = [0, 5, 10, 25, 50] as const;
+export const MIN_REACTIONS_STEPS = [
+  0, 10, 25, 50, 100, 200, 300, 400, 500, 750, 1000,
+] as const;
+export const MIN_ENGAGEMENT_RATE_STEPS = [0, 0.5, 1, 2, 4, 6] as const;
+export const MIN_REPOSTS_STEPS = [0, 5, 10, 25, 50] as const;
+
+/** Sentinel for max sliders — no upper bound. */
+export const NO_LIMIT = Infinity;
+
+/** Max steps mirror min numerics, then end with No Limit. */
+export const MAX_COMMENTS_STEPS = [0, 5, 10, 25, 50, NO_LIMIT] as const;
+export const MAX_REACTIONS_STEPS = [
+  0, 10, 25, 50, 100, 200, 300, 400, 500, 750, 1000, NO_LIMIT,
+] as const;
+export const MAX_ENGAGEMENT_RATE_STEPS = [
+  0, 0.5, 1, 2, 4, 6, NO_LIMIT,
+] as const;
+export const MAX_REPOSTS_STEPS = [0, 5, 10, 25, 50, NO_LIMIT] as const;
+
+export type MinComments = (typeof MIN_COMMENTS_STEPS)[number];
+export type MinReactions = (typeof MIN_REACTIONS_STEPS)[number];
+export type MinEngagementRate = (typeof MIN_ENGAGEMENT_RATE_STEPS)[number];
+export type MinReposts = (typeof MIN_REPOSTS_STEPS)[number];
+
+export type MaxComments = (typeof MAX_COMMENTS_STEPS)[number];
+export type MaxReactions = (typeof MAX_REACTIONS_STEPS)[number];
+export type MaxEngagementRate = (typeof MAX_ENGAGEMENT_RATE_STEPS)[number];
+export type MaxReposts = (typeof MAX_REPOSTS_STEPS)[number];
+
+export function lastThresholdStep<T>(steps: readonly T[]): T {
+  return steps[steps.length - 1] as T;
+}
+
+export function isNoLimit(value: number | null | undefined) {
+  return value == null || !Number.isFinite(value);
+}
+
+export function formatMinCountLabel(value: number, isMaxStep: boolean) {
+  return isMaxStep ? `${value}+` : String(value);
+}
+
+export function formatMinEngagementRateLabel(
+  value: number,
+  isMaxStep: boolean,
+) {
+  const base = `${value.toFixed(1)}%`;
+  return isMaxStep ? `${base}+` : base;
+}
+
+export function formatMaxCountLabel(value: number, _isMaxStep?: boolean) {
+  return isNoLimit(value) ? "No Limit" : String(value);
+}
+
+export function formatMaxEngagementRateLabel(
+  value: number,
+  _isMaxStep?: boolean,
+) {
+  return isNoLimit(value) ? "No Limit" : `${value.toFixed(1)}%`;
+}
+
 const PERIOD_SLUG: Record<TrendsPeriodId, string> = {
   week: "pastweek",
   month: "pastmonth",
@@ -41,6 +103,22 @@ export type ReferenceFilters = {
   count: ReferenceCount;
   /** Case-insensitive match against title, caption, topics, comments. */
   keyword?: string;
+  /** Minimum LinkedIn comments on the post. */
+  minComments?: MinComments;
+  /** Maximum LinkedIn comments on the post. */
+  maxComments?: MaxComments;
+  /** Minimum reactions (likes). */
+  minReactions?: MinReactions;
+  /** Maximum reactions (likes). */
+  maxReactions?: MaxReactions;
+  /** Minimum engagement rate percent (e.g. 2 = 2.0%). */
+  minEngagementRate?: MinEngagementRate;
+  /** Maximum engagement rate percent. */
+  maxEngagementRate?: MaxEngagementRate;
+  /** Minimum organic reposts (excludes own). */
+  minReposts?: MinReposts;
+  /** Maximum organic reposts (excludes own). */
+  maxReposts?: MaxReposts;
 };
 
 function pad2(n: number) {
@@ -100,7 +178,39 @@ export function buildReferenceFilterSlug(
     filters.rankBy;
   const period = PERIOD_SLUG[filters.period] ?? filters.period;
   const kw = slugifyKeyword(filters.keyword ?? "");
-  const base = `${rank}-${period}-${selectedCount}`;
+  const parts = [`${rank}-${period}-${selectedCount}`];
+  if ((filters.minComments ?? 0) > 0) {
+    parts.push(`minc${filters.minComments}`);
+  }
+  if (filters.maxComments != null && !isNoLimit(filters.maxComments)) {
+    parts.push(`maxc${filters.maxComments}`);
+  }
+  if ((filters.minReactions ?? 0) > 0) {
+    parts.push(`minr${filters.minReactions}`);
+  }
+  if (filters.maxReactions != null && !isNoLimit(filters.maxReactions)) {
+    parts.push(`maxr${filters.maxReactions}`);
+  }
+  if ((filters.minEngagementRate ?? 0) > 0) {
+    parts.push(
+      `mineng${String(filters.minEngagementRate).replace(".", "p")}`,
+    );
+  }
+  if (
+    filters.maxEngagementRate != null &&
+    !isNoLimit(filters.maxEngagementRate)
+  ) {
+    parts.push(
+      `maxeng${String(filters.maxEngagementRate).replace(".", "p")}`,
+    );
+  }
+  if ((filters.minReposts ?? 0) > 0) {
+    parts.push(`minrep${filters.minReposts}`);
+  }
+  if (filters.maxReposts != null && !isNoLimit(filters.maxReposts)) {
+    parts.push(`maxrep${filters.maxReposts}`);
+  }
+  const base = parts.join("-");
   return kw ? `${base}-kw-${kw}` : base;
 }
 
@@ -123,35 +233,98 @@ export function filterReferencePosts(
 ): TrendsPostSummary[] {
   const start = periodStartIso(filters.period);
   const keyword = filters.keyword?.trim() ?? "";
+  const minComments = filters.minComments ?? 0;
+  const maxComments =
+    filters.maxComments ?? lastThresholdStep(MAX_COMMENTS_STEPS);
+  const minReactions = filters.minReactions ?? 0;
+  const maxReactions =
+    filters.maxReactions ?? lastThresholdStep(MAX_REACTIONS_STEPS);
+  const minEngagementRate = filters.minEngagementRate ?? 0;
+  const maxEngagementRate =
+    filters.maxEngagementRate ?? lastThresholdStep(MAX_ENGAGEMENT_RATE_STEPS);
+  const minReposts = filters.minReposts ?? 0;
+  const maxReposts =
+    filters.maxReposts ?? lastThresholdStep(MAX_REPOSTS_STEPS);
+
   const inPeriod = posts.filter((p) => {
     if (!p.publishedAt) return false;
     if (start && p.publishedAt < start) return false;
     if (keyword && !postMatchesKeyword(p, keyword)) return false;
+    if (num(p.comments) < minComments) return false;
+    if (!isNoLimit(maxComments) && num(p.comments) > maxComments) return false;
+    if (num(p.likes) < minReactions) return false;
+    if (!isNoLimit(maxReactions) && num(p.likes) > maxReactions) return false;
+    if (num(p.engagementRate) < minEngagementRate) return false;
+    if (
+      !isNoLimit(maxEngagementRate) &&
+      num(p.engagementRate) > maxEngagementRate
+    ) {
+      return false;
+    }
+    if (num(p.organicReposts) < minReposts) return false;
+    if (!isNoLimit(maxReposts) && num(p.organicReposts) > maxReposts) {
+      return false;
+    }
     return true;
   });
 
-  const sorted = inPeriod.slice().sort((a, b) => {
-    switch (filters.rankBy) {
-      case "impressions":
-        return b.impressions - a.impressions;
-      case "engagement":
-        return b.engagements - a.engagements || b.engagementRate - a.engagementRate;
-      case "likes":
-        return b.likes - a.likes;
-      case "comments":
-        return b.comments - a.comments;
-      case "saves":
-        return b.saves - a.saves;
-      case "sends":
-        return b.sends - a.sends;
-      case "recent":
-        return (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "");
-      default:
-        return 0;
-    }
-  });
+  return inPeriod
+    .slice()
+    .sort((a, b) => compareReferencePosts(a, b, filters.rankBy))
+    .slice(0, filters.count);
+}
 
-  return sorted.slice(0, filters.count);
+function num(v: number | null | undefined) {
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+/** Highest / newest first for the active Rank by metric. */
+export function compareReferencePosts(
+  a: TrendsPostSummary,
+  b: TrendsPostSummary,
+  rankBy: ReferenceRankId,
+): number {
+  let primary = 0;
+  switch (rankBy) {
+    case "impressions":
+      primary = num(b.impressions) - num(a.impressions);
+      break;
+    case "engagement":
+      // Rank by raw engagement count; rate is display-only (pill).
+      primary = num(b.engagements) - num(a.engagements);
+      if (primary === 0) {
+        primary = num(b.engagementRate) - num(a.engagementRate);
+      }
+      break;
+    case "likes":
+      primary = num(b.likes) - num(a.likes);
+      break;
+    case "comments":
+      primary = num(b.comments) - num(a.comments);
+      break;
+    case "saves":
+      primary = num(b.saves) - num(a.saves);
+      break;
+    case "sends":
+      primary = num(b.sends) - num(a.sends);
+      break;
+    case "recent":
+      return (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "");
+    default: {
+      const _exhaustive: never = rankBy;
+      void _exhaustive;
+      return 0;
+    }
+  }
+
+  if (primary !== 0) return primary;
+
+  // Stable, useful tie-breakers when the primary metric is tied (or all zeros).
+  const byImpressions = num(b.impressions) - num(a.impressions);
+  if (byImpressions !== 0) return byImpressions;
+  const byEngagements = num(b.engagements) - num(a.engagements);
+  if (byEngagements !== 0) return byEngagements;
+  return (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "");
 }
 
 function metricLine(post: TrendsPostSummary): string {
@@ -196,6 +369,39 @@ export function buildReferenceMarkdown(
   const kw = filters.keyword?.trim();
   if (kw) {
     lines.push(`- **Keyword:** “${kw}”`);
+  }
+  if ((filters.minComments ?? 0) > 0) {
+    lines.push(`- **Minimum comments:** ${filters.minComments}+`);
+  }
+  if (filters.maxComments != null && !isNoLimit(filters.maxComments)) {
+    lines.push(`- **Maximum comments:** ${filters.maxComments}`);
+  }
+  if ((filters.minReactions ?? 0) > 0) {
+    lines.push(`- **Minimum reactions:** ${filters.minReactions}+`);
+  }
+  if (filters.maxReactions != null && !isNoLimit(filters.maxReactions)) {
+    lines.push(`- **Maximum reactions:** ${filters.maxReactions}`);
+  }
+  if ((filters.minEngagementRate ?? 0) > 0) {
+    lines.push(
+      `- **Minimum engagement rate:** ${Number(filters.minEngagementRate).toFixed(1)}%+`,
+    );
+  }
+  if (
+    filters.maxEngagementRate != null &&
+    !isNoLimit(filters.maxEngagementRate)
+  ) {
+    lines.push(
+      `- **Maximum engagement rate:** ${Number(filters.maxEngagementRate).toFixed(1)}%`,
+    );
+  }
+  if ((filters.minReposts ?? 0) > 0) {
+    lines.push(
+      `- **Minimum organic reposts:** ${filters.minReposts}+`,
+    );
+  }
+  if (filters.maxReposts != null && !isNoLimit(filters.maxReposts)) {
+    lines.push(`- **Maximum organic reposts:** ${filters.maxReposts}`);
   }
   lines.push(
     "",
@@ -268,7 +474,7 @@ export function formatReferenceMetric(
     case "impressions":
       return formatCompactNumber(post.impressions);
     case "engagement":
-      return `${post.engagementRate.toFixed(1)}% · ${formatCompactNumber(post.engagements)}`;
+      return formatCompactNumber(post.engagements);
     case "likes":
       return formatCompactNumber(post.likes);
     case "comments":

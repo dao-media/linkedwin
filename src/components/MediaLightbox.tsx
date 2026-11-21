@@ -139,13 +139,13 @@ export function MediaLightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{title}</p>
+          <p className="type-h5 truncate">{title}</p>
           {url ? (
             <a
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-white/70 hover:text-white"
+              className="type-p-s inline-flex items-center gap-1 text-white/70 hover:text-white"
             >
               Open original
               <ExternalLink className="size-3" strokeWidth={1.2} aria-hidden />
@@ -163,7 +163,7 @@ export function MediaLightbox({
               >
                 <ChevronLeft className="size-4" strokeWidth={1.2} aria-hidden />
               </button>
-              <span className="min-w-12 text-center text-xs text-white/80">
+              <span className="type-p-s min-w-12 text-center text-white/80">
                 p. {pdfPage}
               </span>
               <button
@@ -220,7 +220,7 @@ export function MediaLightbox({
               strokeWidth={1.2}
               aria-hidden
             />
-            <p className="mt-3 text-sm font-semibold text-[var(--ink)]">
+            <p className="type-h5 mt-3 text-[var(--ink)]">
               {title}
             </p>
             {url ? (
@@ -228,13 +228,13 @@ export function MediaLightbox({
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"
+                className="type-btn-m mt-3 inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
               >
                 Open document
                 <ExternalLink className="size-3.5" strokeWidth={1.2} aria-hidden />
               </a>
             ) : (
-              <p className="mt-2 text-xs text-[var(--muted)]">
+              <p className="type-p-s mt-2 text-[var(--muted)]">
                 No document URL available
               </p>
             )}
@@ -246,21 +246,21 @@ export function MediaLightbox({
               strokeWidth={1.2}
               aria-hidden
             />
-            <p className="mt-3 break-all text-sm font-semibold text-[var(--ink)]">
+            <p className="type-h5 mt-3 break-all text-[var(--ink)]">
               {url}
             </p>
             <a
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"
+              className="type-btn-m mt-3 inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
             >
               Open link
               <ExternalLink className="size-3.5" strokeWidth={1.2} aria-hidden />
             </a>
           </div>
         ) : (
-          <p className="text-sm text-white/70">No media to display</p>
+          <p className="type-p-m text-white/70">No media to display</p>
         )}
       </div>
     </div>

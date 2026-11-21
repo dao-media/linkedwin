@@ -15,12 +15,12 @@ export default async function EngagePage() {
 
   return (
     <AppShell active="/engage" title="Engage">
-      <p className="mb-4 text-sm text-[var(--muted)]">
+      <p className="mb-4 type-p-m text-[var(--muted)]">
         Ranked accounts/posts to engage with. Opens LinkedIn — no auto-comment
         in v1.
       </p>
       <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-5">
-        <ol className="list-decimal space-y-3 pl-5 text-sm">
+        <ol className="list-decimal space-y-3 pl-5 type-p-m">
           {items.length === 0 && (
             <li className="text-[var(--muted)]">
               No recommendations yet. Seed data or POST /api/engage with scored
@@ -29,7 +29,7 @@ export default async function EngagePage() {
           )}
           {items.map((r) => (
             <li key={r.id}>
-              <span className="font-medium">@{r.handle}</span>
+              <span className="type-label-l">@{r.handle}</span>
               <span className="text-[var(--muted)]"> — {r.reason}</span>
               {r.postUrl && (
                 <>

@@ -4,6 +4,7 @@
  * Usage:
  *   npx tsx scripts/restore-linkedin-session.ts [path/to/session.json]
  */
+import "./_env";
 import fs from "node:fs";
 import path from "node:path";
 import { normalizeLinkedInSessionInput } from "../src/lib/linkedin-session";
